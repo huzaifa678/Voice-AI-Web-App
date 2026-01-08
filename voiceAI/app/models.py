@@ -1,7 +1,9 @@
-from django.db import models
-from django.conf import settings
-from django.utils import timezone
+from time import timezone
 import uuid
+from django.db import models
+from voiceAI.voiceAI import settings
+from django.contrib.auth.models import AbstractUser
+
 
 class RefreshToken(models.Model):
     """
@@ -31,3 +33,22 @@ class RefreshToken(models.Model):
 
     def __str__(self):
         return f"RefreshToken(user={self.user.username}, revoked={self.revoked})"
+    
+    
+class CustomUser(AbstractUser):
+    """
+    Extend Django's default User if needed
+    """
+    pass
+
+class UserProfile(models.Model):
+    """
+    Stores additional info like voice phrase, STT data, etc.
+    """
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="profile")
+    voice_phrase = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.user.username} Profile"
+
+
