@@ -1,9 +1,11 @@
+from django.contrib.auth.models import AbstractUser, Group, Permission
 from time import timezone
 import uuid
 from django.db import models
-from voiceAI.voiceAI import settings
 from django.contrib.auth.models import AbstractUser
+from django.contrib.auth import get_user_model
 
+User = get_user_model()
 
 class RefreshToken(models.Model):
     """
@@ -12,7 +14,7 @@ class RefreshToken(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name="refresh_tokens"
     )
@@ -36,10 +38,20 @@ class RefreshToken(models.Model):
     
     
 class CustomUser(AbstractUser):
-    """
-    Extend Django's default User if needed
-    """
-    pass
+    groups = models.ManyToManyField(
+        Group,
+        related_name="user3553",  
+        blank=True,
+        help_text="The groups this user belongs to.",
+        verbose_name="groups",
+    )
+    user_permissions = models.ManyToManyField(
+        Permission,
+        related_name="user3553", 
+        blank=True,
+        help_text="Specific permissions for this user.",
+        verbose_name="user permissions",
+    )
 
 class UserProfile(models.Model):
     """

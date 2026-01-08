@@ -1,61 +1,74 @@
 import io
 import tempfile
-from tokenize import generate_tokens
-from faster_whisper import WhisperModel
-from pydub import AudioSegment
-from huggingface_hub import User
 import numpy as np
+from pydub import AudioSegment
 from silero_vad import get_speech_timestamps, load_silero_vad
 
-model = WhisperModel("small", compute_type="int8")
 
 class AudioService:
-    
+    _model = None
+
+    @classmethod
+    def model(cls):
+        if cls._model is None:
+            from faster_whisper import WhisperModel  
+            cls._model = WhisperModel(
+                "base",
+                device="cpu",
+                compute_type="int8" 
+            )
+        return cls._model
+
     @staticmethod
     def save_audio_to_wav(audio_bytes: bytes, format: str = "webm") -> str:
         """
         Converts raw audio bytes to a temporary WAV file
-        Returns the path to the WAV file
         """
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             audio = AudioSegment.from_file(io.BytesIO(audio_bytes), format=format)
-            audio = audio.set_channels(1).set_frame_rate(16000)  # mono 16kHz
+            audio = audio.set_channels(1).set_frame_rate(16000)
             audio.export(tmp.name, format="wav")
             return tmp.name
 
-    @staticmethod
-    def transcribe(wav_path):
+    @classmethod
+    def transcribe(cls, wav_path: str) -> str:
+        model = cls.model()
         segments, _ = model.transcribe(wav_path)
         return " ".join(seg.text for seg in segments)
-    
-    @staticmethod
-    def transcribe_pcm(audio_pcm: bytes, sample_rate=16000):
-        """
-        Transcribe raw PCM bytes (from mic)
-        """
-        audio = np.frombuffer(audio_pcm, dtype=np.int16).astype("float32") / 32768.0
+
+    @classmethod
+    def transcribe_pcm(cls, audio_pcm: bytes, sample_rate: int = 16000):
+        audio = (
+            np.frombuffer(audio_pcm, dtype=np.int16)
+            .astype(np.float32) / 32768.0
+        )
 
         if not VADService.is_speech(audio, sample_rate):
             return None
 
+        model = cls.model()
         segments, _ = model.transcribe(audio)
         return " ".join(seg.text for seg in segments)
 
     @staticmethod
-    def verify_phrase(text, expected):
+    def verify_phrase(text: str, expected: str) -> bool:
         return expected.lower() in text.lower()
-    
-    @staticmethod
-    def process_audio(audio_pcm: bytes, sample_rate=16000):
-        audio = np.frombuffer(audio_pcm, dtype=np.int16).astype("float32") / 32768.0
+
+    @classmethod
+    def process_audio(cls, audio_pcm: bytes, sample_rate: int = 16000):
+        audio = (
+            np.frombuffer(audio_pcm, dtype=np.int16)
+            .astype(np.float32) / 32768.0
+        )
 
         if not VADService.is_speech(audio, sample_rate):
-            return None  
+            return None
 
+        model = cls.model()
         segments, _ = model.transcribe(audio)
         return " ".join(seg.text for seg in segments)
-    
-    
+
+
 class VADService:
     _model = None
 
@@ -71,9 +84,6 @@ class VADService:
         sample_rate: int = 16000,
         min_speech_ms: int = 300,
     ) -> bool:
-        """
-        audio: float32 numpy array (-1..1)
-        """
         timestamps = get_speech_timestamps(
             audio,
             VADService.model(),

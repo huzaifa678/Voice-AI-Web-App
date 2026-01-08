@@ -2,13 +2,12 @@ import os
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from datetime import timedelta
 import uuid
 
 from app.common.jwt import generate_token
 from app.common.rate_limit import rate_limit
 from app.common.utils import parse_timedelta
-from app.auth.models import RefreshToken  
+from app.models import RefreshToken  
 
 User = get_user_model()
 
