@@ -1,0 +1,15 @@
+Django>=4.2,<5.1
+djangorestframework>=3.14
+djangorestframework-simplejwt
+rest_framework_simplejwt
+channels>=4.0
+channels-redis>=4.1
+torch>=2.0,<2.3
+faster-whisper>=1.2.0
+silero-vad
+onnxruntime>=1.14,<2
+pydub>=0.25.1
+ffmpeg-python>=0.2.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+groq
