@@ -60,3 +60,11 @@ class AuthService:
         return {
             "access": access_token,
         }
+        
+    @staticmethod
+    def register(username: str, email: str, password: str):
+        if User.objects.filter(username=username).exists():
+            raise ValueError("Username already exists")
+
+        user = User.objects.create_user(username=username, email=email, password=password)
+        return user

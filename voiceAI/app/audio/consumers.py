@@ -1,6 +1,6 @@
 from channels.generic.websocket import AsyncWebsocketConsumer
 import json
-
+from app.common.rabbit_mq import publish_audio_task
 from .services import AudioService
 from app.common.rate_limit import rate_limit
 
@@ -18,6 +18,9 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
         if not bytes_data:
             return
 
-        text = AudioService.process_audio(bytes_data)
-        if text:
-            await self.send(json.dumps({"text": text}))
+        publish_audio_task(
+            user_id=str(self.scope.get("user", {}).get("id", "anon")),
+            audio_bytes=bytes_data
+        )
+
+        await self.send(text_data=json.dumps({"status": "queued"}))

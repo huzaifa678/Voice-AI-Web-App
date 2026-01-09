@@ -6,12 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: voice-ai-web
-    command: >
-      sh -c "
-      python manage.py migrate &&
-      python manage.py collectstatic --noinput &&
-      daphne -b 0.0.0.0 -p 8000 core.asgi:application
-      "
+    command: python app/audio/worker.py
     volumes:
       - .:/app
     ports:
@@ -21,6 +16,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - rabbitmq
     networks:
       - voice-ai-net
 
@@ -28,9 +24,9 @@ services:
     image: postgres:16
     container_name: voice-ai-postgres
     environment:
-      POSTGRES_DB: voiceai
-      POSTGRES_USER: voiceai
-      POSTGRES_PASSWORD: voiceai
+      POSTGRES_DB: voice_ai_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -43,6 +39,18 @@ services:
     container_name: voice-ai-redis
     ports:
       - "6379:6379"
+    networks:
+      - voice-ai-net
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: voice-ai-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"   
+      - "15672:15672"
     networks:
       - voice-ai-net
 
