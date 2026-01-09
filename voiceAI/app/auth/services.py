@@ -1,9 +1,10 @@
 import os
+from tokenize import TokenError
+from rest_framework_simplejwt.tokens import AccessToken
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
-from django.utils import timezone
-import uuid
-
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import AuthenticationFailed
 from app.common.jwt import generate_token
 from app.common.rate_limit import rate_limit
 from app.common.utils import parse_timedelta
@@ -14,6 +15,14 @@ User = get_user_model()
 class AuthService:
 
     REFRESH_TOKEN_LIFETIME = parse_timedelta(os.getenv("REFRESH_TOKEN_LIFETIME", "7d"))
+    
+    @staticmethod
+    def register(username: str, email: str, password: str):
+        if User.objects.filter(username=username).exists():
+            raise ValueError("Username already exists")
+
+        user = User.objects.create_user(username=username, email=email, password=password)
+        return user
     
     @staticmethod
     def login(ip: str, username: str, password: str):
@@ -27,21 +36,8 @@ class AuthService:
         if not user:
             raise ValueError("Invalid credentials")
 
-        access_token = generate_token(user)
-
-        refresh_token = str(uuid.uuid4())
-        expires_at = timezone.now() + AuthService.REFRESH_TOKEN_LIFETIME
-        RefreshToken.objects.create(
-            user=user,
-            token=refresh_token,
-            expires_at=expires_at
-        )
-
-        return {
-            "access": access_token,
-            "refresh": refresh_token
-        }
-
+        return generate_token(user)
+    
     @staticmethod
     def refresh(refresh_token_str: str):
         """
@@ -62,9 +58,37 @@ class AuthService:
         }
         
     @staticmethod
-    def register(username: str, email: str, password: str):
-        if User.objects.filter(username=username).exists():
-            raise ValueError("Username already exists")
+    def verify_token(token: str):
+        """
+        Verify JWT access token and return user
+        """
+        try:
+            access = AccessToken(token)
+        except TokenError:
+            raise ValueError("Invalid or expired token")
 
-        user = User.objects.create_user(username=username, email=email, password=password)
-        return user
+        user_id = access.get("user_id")
+        if not user_id:
+            raise ValueError("Invalid token payload")
+
+        try:
+            return User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            raise ValueError("User not found")
+        
+    
+class JWTAuthenticationService(BaseAuthentication):
+    def authenticate(self, request):
+        auth = request.headers.get("Authorization")
+
+        if not auth or not auth.startswith("Bearer "):
+            return None
+
+        token = auth.split("Bearer ")[1].strip()
+
+        try:
+            user = AuthService.verify_token(token)
+        except Exception:
+            raise AuthenticationFailed("Invalid or expired token")
+
+        return (user, token)

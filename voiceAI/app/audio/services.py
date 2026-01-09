@@ -42,14 +42,13 @@ class AudioService:
             np.frombuffer(audio_pcm, dtype=np.int16)
             .astype(np.float32) / 32768.0
         )
-
         if not VADService.is_speech(audio, sample_rate):
             return None
 
         model = cls.model()
         segments, _ = model.transcribe(audio)
         return " ".join(seg.text for seg in segments)
-
+    
     @staticmethod
     def verify_phrase(text: str, expected: str) -> bool:
         return expected.lower() in text.lower()

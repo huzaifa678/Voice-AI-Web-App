@@ -1,60 +1,59 @@
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from asgiref.sync import sync_to_async
 import os
+from app.audio.services import AudioService, VADService
+from app.common.rate_limit import rate_limit
+from rest_framework.permissions import IsAuthenticated
 
-from app.audio.services import AudioService
-from app.common import rate_limit
+executor = ThreadPoolExecutor(max_workers=2)
 
-executor = ThreadPoolExecutor(max_workers=2)  
 
 class AudioTranscribeView(APIView):
+    """
+    Receives raw audio bytes (from WebSocket or other clients),
+    converts to WAV temporarily, runs VAD and transcription.
+    """
+    permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        user_id = request.user.id if request.user.is_authenticated else None
-        ip = request.META.get("REMOTE_ADDR", "unknown")
-
+    async def post(self, request):
         rate_limit(
-            key=f"audio-transcribe:{user_id or ip}",
-            limit=20,
+            key=f"audio-transcribe:{request.user.id}",
+            limit=30,
             window_seconds=60,
         )
 
-        audio_file = request.FILES.get("audio")
-        if not audio_file:
-            return Response(
-                {"detail": "Audio file required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        audio_bytes = request.data.get("audio")
+        if not audio_bytes:
+            return Response({"detail": "Audio bytes required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            wav_path = AudioService.save_audio_to_wav(
-                audio_file.read(),
-                format="webm",
-            )
-        except Exception as e:
-            return Response(
-                {"detail": f"Failed to process audio: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        wav_path = await sync_to_async(
+            AudioService.save_audio_to_wav,
+            thread_sensitive=False
+        )(audio_bytes, format="webm")  
 
-        try:
-            future = executor.submit(AudioService.transcribe, wav_path)
-            text = future.result()
-        finally:
-            if os.path.exists(wav_path):
-                os.remove(wav_path)
+        import soundfile as sf
+        audio_pcm, sr = sf.read(wav_path, dtype="int16")
+        audio_bytes_pcm = audio_pcm.tobytes()
 
-        if not text.strip():
-            return Response(
-                {"detail": "No speech detected in audio"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if not VADService.is_speech(audio_pcm, sample_rate=sr):
+            os.remove(wav_path)
+            return Response({"detail": "No speech detected"}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(
-            {"transcript": text},
-            status=status.HTTP_200_OK,
+        loop = asyncio.get_running_loop()
+        text = await loop.run_in_executor(
+            executor,
+            AudioService.transcribe_pcm,
+            audio_bytes_pcm,
+            sr
         )
 
+        os.remove(wav_path)
 
+        if not text.strip():
+            return Response({"detail": "No speech detected"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response({"transcript": text}, status=status.HTTP_200_OK)

@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from app.serializers.register_serializer import RegisterSerializer
 from app.serializers.login_serializer import LoginSerializer
 from app.serializers.refresh_serializer import RefreshSerializer
-from voiceAI.app.common.rabbit_mq import publish_email_task
+from app.common.rabbit_mq import publish_email_task
 from .services import AuthService
 
 User = get_user_model()
