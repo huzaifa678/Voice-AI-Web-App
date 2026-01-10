@@ -1,9 +1,9 @@
+import asyncio
 from channels.generic.websocket import AsyncWebsocketConsumer
 import json
-import asyncio
 import httpx
-from app.common.rabbit_mq import publish_audio_task
-from app.audio.services import AudioService, VADService
+from app.common.rabbit_mq import get_channel
+from app.audio.services import VADService
 from app.common.rate_limit import rate_limit
 import numpy as np
 
@@ -36,27 +36,12 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
         if not VADService.is_speech(audio_np):
             return
 
-        loop = asyncio.get_running_loop()
-        text = await loop.run_in_executor(
-            None,
-            AudioService.transcribe_pcm,
-            self.audio_buffer
-        )
-
-        if not text:
-            return
-
         try:
             response = await self.send_to_view(self.audio_buffer)
         except Exception as e:
             await self.send(text_data=json.dumps({"error": str(e)}))
             self.audio_buffer = b""
             return
-
-        publish_audio_task(
-            user_id=str(self.scope["user"].id if self.scope["user"].is_authenticated else "anon"),
-            audio_bytes=self.audio_buffer,
-        )
 
         await self.send(text_data=json.dumps(response))
 
@@ -77,3 +62,23 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
             )
             resp.raise_for_status()
             return resp.json()
+        
+    async def listen_llm_responses(self):
+        """
+        Consume LLM responses from 'audio_responses' and forward to this client
+        """
+        connection = get_channel()
+        channel = connection.channel()
+        channel.queue_declare(queue="audio_responses")
+
+        def callback(ch, method, body):
+            data = json.loads(body)
+            if data.get("user_id") == self.user_id:
+                asyncio.run_coroutine_threadsafe(
+                    self.send(text_data=json.dumps(data)), asyncio.get_event_loop()
+                )
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        channel.basic_consume(queue="audio_responses", on_message_callback=callback)
+        print(f"Listening for LLM responses for user {self.user_id}")
+        channel.start_consuming()

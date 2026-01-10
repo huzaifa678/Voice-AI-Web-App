@@ -1,7 +1,13 @@
+import os
+import django
 import json
-from voiceAI.voiceAI import settings
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
+django.setup()
+
+from django.conf import settings
 from django.core.mail import send_mail
-from app.common.rabbit_mq import channel
+from app.common.rabbit_mq import get_channel
 
 def callback(ch, method, properties, body):
     data = json.loads(body)
@@ -16,10 +22,13 @@ def callback(ch, method, properties, body):
         message=message,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[to_email],
+        fail_silently=False,
     )
 
     print(f"Email sent to {to_email}")
     ch.basic_ack(delivery_tag=method.delivery_tag)
+    
+channel, _ = get_channel()
 
 channel.basic_qos(prefetch_count=1)
 channel.basic_consume(queue="email_tasks", on_message_callback=callback)

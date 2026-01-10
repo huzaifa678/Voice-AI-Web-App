@@ -9,8 +9,9 @@ from app.audio.services import AudioService, VADService
 from app.common.rate_limit import rate_limit
 from rest_framework.permissions import IsAuthenticated
 
-executor = ThreadPoolExecutor(max_workers=2)
+from app.common.rabbit_mq import publish_audio_task
 
+executor = ThreadPoolExecutor(max_workers=2)
 
 class AudioTranscribeView(APIView):
     """
@@ -26,7 +27,7 @@ class AudioTranscribeView(APIView):
             window_seconds=60,
         )
 
-        audio_bytes = request.data.get("audio")
+        audio_bytes = request.body
         if not audio_bytes:
             return Response({"detail": "Audio bytes required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -55,5 +56,10 @@ class AudioTranscribeView(APIView):
 
         if not text.strip():
             return Response({"detail": "No speech detected"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        publish_audio_task(
+            user_id=str(self.scope["user"].id if self.scope["user"].is_authenticated else "anon"),
+            audio_bytes=self.audio_buffer,
+        )
         
         return Response({"transcript": text}, status=status.HTTP_200_OK)

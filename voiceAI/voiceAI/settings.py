@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,7 +29,11 @@ SECRET_KEY = 'django-insecure-&j*0*buq9ex!mezwm(cr6&hx6u_5ye&g0_4ah132jqxx@$mo59
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+]
+
 
 
 # Application definition
@@ -41,7 +48,30 @@ INSTALLED_APPS = [
     "rest_framework",
     "channels",
     "app",
+    "corsheaders",
 ]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
+
+CORS_ALLOW_CREDENTIALS = True  
+
+DEFAULT_FROM_EMAIL = "no-reply@voiceai.com"
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+EMAIL_HOST = 'smtp.gmail.com' 
+
+EMAIL_PORT = 587 
+
+EMAIL_HOST_USER = os.getenv('GOOGLE_USER_EMAIL')
+
+EMAIL_HOST_PASSWORD = os.getenv('GOOGLE_APP_PASSWORD')
+
+EMAIL_USE_TLS = True
+
+EMAIL_USE_SSL = False
 
 ROOT_URLCONF = 'voiceAI.urls'
 
@@ -53,6 +83,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'voiceAI.urls'

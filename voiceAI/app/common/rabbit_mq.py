@@ -1,6 +1,10 @@
+import base64
 import json
 import os
+from dotenv import load_dotenv
 import pika
+
+load_dotenv()
 
 
 def get_channel():
@@ -16,10 +20,10 @@ def get_channel():
 
 def publish_audio_task(user_id: str, audio_bytes: bytes):
     channel, _ = get_channel()
-    
+    channel.queue_declare(queue="audio_tasks", durable=True)
     payload = {
         "user_id": user_id,
-        "audio_bytes": audio_bytes,
+        "audio_bytes": base64.b64encode(audio_bytes).decode()
     }
     
     channel.basic_publish(
@@ -30,6 +34,8 @@ def publish_audio_task(user_id: str, audio_bytes: bytes):
     
 def publish_email_task(email_data: dict):
     channel, _ = get_channel()
+    channel.queue_declare(queue="email_tasks", durable=True)
+    print(f"Publishing email task: {email_data}") 
     import json
     channel.basic_publish(
         exchange="",
