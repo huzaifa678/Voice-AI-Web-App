@@ -34,7 +34,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
 ]
 
-
+ASGI_APPLICATION = "voiceAI.asgi.application"
 
 # Application definition
 
@@ -57,8 +57,6 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True  
 
-DEFAULT_FROM_EMAIL = "no-reply@voiceai.com"
-
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 EMAIL_HOST = 'smtp.gmail.com' 
@@ -68,6 +66,8 @@ EMAIL_PORT = 587
 EMAIL_HOST_USER = os.getenv('GOOGLE_USER_EMAIL')
 
 EMAIL_HOST_PASSWORD = os.getenv('GOOGLE_APP_PASSWORD')
+
+DEFAULT_FROM_EMAIL =EMAIL_HOST_USER
 
 EMAIL_USE_TLS = True
 

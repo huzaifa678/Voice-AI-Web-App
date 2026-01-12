@@ -58,8 +58,8 @@ class AudioTranscribeView(APIView):
             return Response({"detail": "No speech detected"}, status=status.HTTP_400_BAD_REQUEST)
         
         publish_audio_task(
-            user_id=str(self.scope["user"].id if self.scope["user"].is_authenticated else "anon"),
-            audio_bytes=self.audio_buffer,
+            user_id=str(request.user.id),
+            audio_bytes=audio_bytes,
         )
         
         return Response({"transcript": text}, status=status.HTTP_200_OK)

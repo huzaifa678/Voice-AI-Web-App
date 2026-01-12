@@ -1,6 +1,10 @@
 import os
 import django
 import json
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
 django.setup()

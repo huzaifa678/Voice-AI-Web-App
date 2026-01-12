@@ -18,11 +18,14 @@ export const authSlice = createSlice({
   reducers: {
     setCredentials: (
       state,
-      action: PayloadAction<{ access: string; refresh: string; user?: any }>
+      action: PayloadAction<{ access: string | null; refresh: string; user?: any }>
     ) => {
       state.accessToken = action.payload.access;
       state.refreshToken = action.payload.refresh;
       if (action.payload.user) state.user = action.payload.user;
+
+      localStorage.setItem("access-token", state.accessToken || "");
+      localStorage.setItem("refresh-token", state.refreshToken);
     },
     logout: (state) => {
       state.accessToken = null;

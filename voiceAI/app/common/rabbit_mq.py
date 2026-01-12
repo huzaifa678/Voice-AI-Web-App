@@ -1,21 +1,22 @@
 import base64
 import json
-import os
-from dotenv import load_dotenv
 import pika
+import os
 
-load_dotenv()
-
+_connection = None
+_channel = None
 
 def get_channel():
-    rabbitmq_url = os.getenv("RABBITMQ_URL")
-    if not rabbitmq_url:
-        raise RuntimeError("RABBITMQ_URL is not set")
+    global _connection, _channel
 
+    if _connection and _connection.is_open:
+        return _channel, _connection
+
+    rabbitmq_url = os.getenv("RABBITMQ_URL")
     params = pika.URLParameters(rabbitmq_url)
-    connection = pika.BlockingConnection(params)
-    channel = connection.channel()
-    return channel, connection
+    _connection = pika.BlockingConnection(params)
+    _channel = _connection.channel()
+    return _channel, _connection
 
 
 def publish_audio_task(user_id: str, audio_bytes: bytes):
@@ -45,6 +46,13 @@ def publish_email_task(email_data: dict):
     )
 
 def close_connection():
-    _, connection = get_channel()
-    if connection and connection.is_open:
-        connection.close()
+    global _connection, _channel
+
+    if _channel and _channel.is_open:
+        _channel.close()
+
+    if _connection and _connection.is_open:
+        _connection.close()
+
+    _channel = None
+    _connection = None

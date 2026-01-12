@@ -20,9 +20,7 @@ class RegisterView(APIView):
                     username=serializer.validated_data['username'],
                     email=serializer.validated_data['email'],
                     password=serializer.validated_data['password'],
-                )
-            
-                    
+                )   
                 
                 publish_email_task({
                     "to_email": user.email,
@@ -44,11 +42,17 @@ class LoginView(APIView):
         if serializer.is_valid():
             ip = request.META.get("REMOTE_ADDR", "unknown")
             try:
-                tokens = AuthService.login(
+                accessToken, refreshToken = AuthService.login(
                     ip=ip,
                     username=serializer.validated_data['username'],
                     password=serializer.validated_data['password'],
                 )
+                
+                tokens = {
+                    "access": accessToken,
+                    "refresh": refreshToken
+                }
+                
                 return Response(tokens, status=status.HTTP_200_OK)
             except ValueError as e:
                 return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
@@ -59,8 +63,10 @@ class RefreshView(APIView):
         serializer = RefreshSerializer(data=request.data)
         if serializer.is_valid():
             try:
+                print("serialized data", serializer.validated_data['refresh'])
                 token = AuthService.refresh(serializer.validated_data['refresh'])
                 return Response(token, status=status.HTTP_200_OK)
             except ValueError as e:
+                print(e)
                 return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

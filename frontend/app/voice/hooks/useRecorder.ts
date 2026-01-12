@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useAudioContext } from "./useAudioContext";
 
-export function useRecorder(onFrame: (pcm: Int16Array) => void) {
+export function useRecorder(onFrame: (pcmBuffer: ArrayBuffer) => void) {
   const { getContext } = useAudioContext();
   const nodeRef = useRef<AudioWorkletNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -13,7 +13,14 @@ export function useRecorder(onFrame: (pcm: Int16Array) => void) {
     const source = ctx.createMediaStreamSource(streamRef.current);
 
     const node = new AudioWorkletNode(ctx, "pcm-processor");
-    node.port.onmessage = e => onFrame(e.data);
+    node.port.onmessage = e => {
+      const pcm = e.data as Int16Array;
+
+      const rms = Math.sqrt(pcm.reduce((sum, val) => sum + val * val, 0) / pcm.length);
+      console.log("Audio RMS:", rms.toFixed(3));
+
+      onFrame(pcm.buffer as ArrayBuffer);
+    }
 
     source.connect(node);
     node.connect(ctx.destination);
@@ -28,4 +35,3 @@ export function useRecorder(onFrame: (pcm: Int16Array) => void) {
 
   return { start, stop };
 }
-

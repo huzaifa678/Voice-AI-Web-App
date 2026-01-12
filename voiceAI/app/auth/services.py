@@ -1,5 +1,8 @@
 import os
+import secrets
+from django.utils import timezone
 from tokenize import TokenError
+from dotenv import load_dotenv
 from rest_framework_simplejwt.tokens import AccessToken
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
@@ -10,11 +13,13 @@ from app.common.rate_limit import rate_limit
 from app.common.utils import parse_timedelta
 from app.models import RefreshToken  
 
+load_dotenv()
+
 User = get_user_model()
 
-class AuthService:
+REFRESH_TOKEN_LIFETIME = parse_timedelta(os.getenv("REFRESH_TOKEN_LIFETIME"))
 
-    REFRESH_TOKEN_LIFETIME = parse_timedelta(os.getenv("REFRESH_TOKEN_LIFETIME", "7d"))
+class AuthService:
     
     @staticmethod
     def register(username: str, email: str, password: str):
@@ -26,6 +31,9 @@ class AuthService:
     
     @staticmethod
     def login(ip: str, username: str, password: str):
+        
+        print("lifetime", REFRESH_TOKEN_LIFETIME)
+        
         rate_limit(
             key=f"login:{ip}",
             limit=5,
@@ -35,8 +43,18 @@ class AuthService:
         user = authenticate(username=username, password=password)
         if not user:
             raise ValueError("Invalid credentials")
+        
+        aceessToken = generate_token(user)
+        
+        refreshToken = secrets.token_urlsafe(64)
+        
+        RefreshToken.objects.create(
+            user=user,
+            token=refreshToken,
+            expires_at=timezone.now() + REFRESH_TOKEN_LIFETIME,
+        )
 
-        return generate_token(user)
+        return aceessToken, refreshToken
     
     @staticmethod
     def refresh(refresh_token_str: str):

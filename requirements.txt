@@ -18,3 +18,5 @@ numpy==1.26.4
 pika
 soundfile
 django-cors-headers
+daphne
+uvicorn[standard]

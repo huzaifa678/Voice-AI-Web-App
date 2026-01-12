@@ -81,17 +81,21 @@ class VADService:
     def is_speech(
         audio: np.ndarray,
         sample_rate: int = 16000,
-        min_speech_ms: int = 300,
+        min_speech_ms: int = 500,
     ) -> bool:
+        
         timestamps = get_speech_timestamps(
             audio,
             VADService.model(),
             sampling_rate=sample_rate,
         )
+        
+        print("timestamps", timestamps)
 
         if not timestamps:
+            print("returning false")
             return False
-
+        
         duration_ms = sum(
             (t["end"] - t["start"]) / sample_rate * 1000
             for t in timestamps

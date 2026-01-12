@@ -17,8 +17,9 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const tokens = await loginUser(username, password); // just fetch API
-      dispatch(setCredentials(tokens)); // hook inside client component
+      const tokens = await loginUser(username, password); 
+      dispatch(setCredentials(tokens)); 
+      console.log("tokens", tokens)
       router.push("/voice");
     } catch (err: any) {
       setError(err.response?.data?.detail || "Login failed");

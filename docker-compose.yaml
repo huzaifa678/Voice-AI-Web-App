@@ -6,7 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: voice-ai-web
-    command: python app/audio/worker.py
+    command: chmod +x voiceAI/start.sh
+      ./voiceAI/start.sh
     volumes:
       - .:/app
     ports:

@@ -2,6 +2,7 @@ import { store } from "../redux/store";
 import { setCredentials, logout } from "../redux/authSlice";
 import { api } from "./api.config";
 import { refreshAccessToken } from "@/api/auth/refresh.route";
+import axios from "axios";
 
 api.interceptors.request.use((config) => {
   const token = store.getState().auth.accessToken;
@@ -22,11 +23,12 @@ api.interceptors.response.use(
       }
 
       try {
-        const newAccess = await refreshAccessToken(refreshToken);
+        const data = await refreshAccessToken(refreshToken)
+        const tokenToUse = data.access;
         store.dispatch(
-          setCredentials({ access: newAccess, refresh: refreshToken })
+          setCredentials({ access: tokenToUse, refresh: refreshToken })
         );
-        originalRequest.headers["Authorization"] = `Bearer ${newAccess}`;
+        originalRequest.headers["Authorization"] = `Bearer ${tokenToUse}`;
         return api(originalRequest);
       } catch (err) {
         store.dispatch(logout());
