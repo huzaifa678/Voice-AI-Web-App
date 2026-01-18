@@ -1,149 +1,262 @@
 import asyncio
-from channels.generic.websocket import AsyncWebsocketConsumer
+import time
 import json
-import httpx
-from app.common.rabbit_mq import get_channel
+import aio_pika
+import grpc
+import numpy as np
+from channels.generic.websocket import AsyncWebsocketConsumer
+
 from app.audio.services import VADService
 from app.common.rate_limit import rate_limit
-import numpy as np
+from app.common.rabbit_mq import get_connection
+from app.grpc import audio_pb2, service_pb2_grpc
+
+TARGET_SR = 16000
+
+FRAME_SAMPLES = 512
+HOP_SAMPLES   = 512   
+
+SPEECH_START_PROB = 0.20
+SPEECH_END_PROB   = 0.10
+
+SILENCE_TIMEOUT = 0.4
+SMOOTH_WINDOW_MS = 100
+
+RMS_GATE = 0.005    
+INT16_MAX = 32767
 
 
 class AudioStreamConsumer(AsyncWebsocketConsumer):
+
     async def connect(self):
         ip = self.scope["client"][0]
         self.user_id = getattr(self.scope.get("user"), "id", None)
-        
-        print("Connecting user_id:", self.user_id)
-        
+
         if self.user_id is None:
-            await self.close(code=4401)  
+            await self.close(code=4401)
             return
-        
-        self.in_speech = False
-        self.last_speech_ts = None
-        self.silence_timeout = 0.6  
-        
-        rate_limit(
-            key=f"ws:{ip}",
-            limit=30,
-            window_seconds=60,
-        )
-        
+
+        rate_limit(key=f"ws:{ip}", limit=30, window_seconds=60)
+
+        self.vad_frame_buffer = np.array([], dtype=np.float32)
         self.audio_buffer = b""
+        self.prob_history = []
+
+        self.in_speech = False
+        self.speech_ms = 0.0
+        self.last_speech_ts = None
+        
+        self.warmup_frames = 5
+
         await self.accept()
         
-        asyncio.create_task(self.listen_llm_responses())
+        self.log_queue = asyncio.Queue()
+        self.log_task = asyncio.create_task(self._log_worker())
+
+        self.listen_task = asyncio.create_task(self.listen_llm_responses())
+
+        print(f"Connected user {self.user_id}")
+
 
     async def receive(self, text_data=None, bytes_data=None):
-        """
-        Recieves audio bytes from the client, buffers them and calls the view for processing.
-        """
-        
         if not bytes_data:
-            print("No bytes received")
             return
-            
-        self.audio_buffer += bytes_data
-        
-        min_bytes = int(16000 * 1.0 * 2) 
 
-        if len(self.audio_buffer) < min_bytes:
-            return 
-        
-        audio_np = (
-            np.frombuffer(self.audio_buffer, dtype=np.int16)
-            .astype("float32") / 32768.0
+        audio = np.frombuffer(bytes_data, dtype=np.int16).astype(np.float32)
+        audio /= INT16_MAX
+
+        self.vad_frame_buffer = np.concatenate([self.vad_frame_buffer, audio])
+
+        smooth_frame_count = max(
+            1,
+            int(SMOOTH_WINDOW_MS / (FRAME_SAMPLES / TARGET_SR * 1000))
         )
 
-        is_speech = VADService.is_speech(audio_np)
+        while len(self.vad_frame_buffer) >= FRAME_SAMPLES:
+            frame = self.vad_frame_buffer[:FRAME_SAMPLES]
+            self.vad_frame_buffer = self.vad_frame_buffer[FRAME_SAMPLES:]
 
-        now = asyncio.get_event_loop().time()
+            if self.warmup_frames > 0:
+                self.warmup_frames -= 1
+                continue
 
-        if is_speech:
-            self.audio_buffer += bytes_data
-            self.in_speech = True
-            self.last_speech_ts = now
-            print("returning")
-            return
-        
-        
-        
-        print("is_speech", is_speech)
-        
-        if self.in_speech:
-            print("inside in speech")
-            if now - self.last_speech_ts > self.silence_timeout:
-                await self.process_buffer()
-                self.audio_buffer = b""
-                self.in_speech = False
-                print("awaited")
-        
-        print("done")
+            now = time.monotonic()
+            rms = np.sqrt(np.mean(frame ** 2))
 
-        try:
-            response = await self.send_to_view(self.audio_buffer)
-            print("SENT")
-        except Exception as e:
-            await self.send(text_data=json.dumps({"error": str(e)}))
-            self.audio_buffer = b""
-            return
+            if rms < RMS_GATE:
+                prob = 0.0
+            else:
+                prob = float(
+                    VADService.speech_prob(frame, sample_rate=TARGET_SR)
+                )
 
-        await self.send(text_data=json.dumps(response))
+            self.prob_history.append(prob)
+            if len(self.prob_history) > smooth_frame_count:
+                self.prob_history.pop(0)
 
-        self.audio_buffer = b""
-        
-    async def process_buffer(self):
-        if len(self.audio_buffer) < 16000 * 2 * 0.5:
-            return
+            smooth_prob = prob if not self.in_speech else float(np.mean(self.prob_history))
 
-        try:
-            response = await self.send_to_view(self.audio_buffer)
-            await self.send(text_data=json.dumps(response))
-        except Exception as e:
-            await self.send(text_data=json.dumps({"error": str(e)}))
-
-
-    async def send_to_view(self, audio_bytes):
-        """
-        Send buffered audio to the transcription view via internal API call.
-        """
-        auth_header = dict(self.scope["headers"]).get(b'authorization', b'').decode()
-        token = auth_header.split("Bearer ")[-1] if "Bearer " in auth_header else ""
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "http://localhost:8000/api/audio/transcribe/",
-                headers={"Authorization": f"Bearer {token}"},
-                content=audio_bytes
+            await self.log(
+                f"[VAD] rms={rms:.4f} "
+                f"prob={prob:.3f} "
+                f"smooth={smooth_prob:.3f} "
+                f"in_speech={self.in_speech}"
             )
-            resp.raise_for_status()
-            return resp.json()
+
+            if not self.in_speech and smooth_prob > SPEECH_START_PROB:
+                await self.log("[VAD] SPEECH START")
+                self.in_speech = True
+                self.last_speech_ts = now
+                self.audio_buffer = b""
+                self.prob_history.clear()
+
+            if self.in_speech:
+                self.audio_buffer += (frame * INT16_MAX).astype(np.int16).tobytes()
+
+                if smooth_prob > SPEECH_END_PROB:
+                    self.last_speech_ts = now
+
+                elif (now - self.last_speech_ts) > SILENCE_TIMEOUT:
+                    await self.log("[VAD] SPEECH END")
+                    await self.process_buffer()
+
+                    self.in_speech = False
+                    self.audio_buffer = b""
+                    self.last_speech_ts = None
+                    self.prob_history.clear()
+                    self.warmup_frames = 3   
+
+
+    async def process_buffer(self):
+        await self.log("enter the process buffer method")
+        min_bytes = int(TARGET_SR * 2 * 0.5)  # 0.5 sec PCM16
+        if len(self.audio_buffer) < min_bytes:
+            await self.log("[VAD] Dropped short utterance")
+            return
         
+        try:
+            await self.log("calling the grpc method")
+            response = await self.send_to_grpc(self.audio_buffer)
+            await self.send(text_data=json.dumps(response))
+            await self.log("called the grpc method")
+        except Exception as e:
+            await self.send(text_data=json.dumps({"error": str(e)}))
+
+        # try:
+        #     await self.log("entered the service body")
+        #     result = await transcribe_audio_bytes(
+        #         self.audio_buffer,
+        #         user_id=str(self.user_id),
+        #     )
+        #     await self.send(text_data=json.dumps(result))
+        # except Exception as e:
+        #     await self.send(text_data=json.dumps({"error": str(e)}))
+        
+    async def send_to_grpc(self, audio_bytes: bytes):
+        """
+        Stream audio in small chunks to the gRPC AudioService and get transcription.
+        """
+        user_id = str(self.user_id) if self.user_id else "anonymous"
+        await self.log("entered the grpc method")
+
+        async with grpc.aio.insecure_channel("localhost:50051") as channel:
+            stub = service_pb2_grpc.AudioServiceStub(channel)
+            await self.log("created stub")
+
+            async def gen_chunks():
+                """
+                Split audio_bytes into small PCM16 chunks and yield them.
+                """
+                chunk_size = 16000  
+                for i in range(0, len(audio_bytes), chunk_size * 2):
+                    chunk = audio_bytes[i:i + chunk_size * 2]
+                    if not chunk:
+                        break
+                    yield audio_pb2.AudioChunk(pcm=chunk)
+                    await asyncio.sleep(0)  
+
+            try:
+                response = await asyncio.wait_for(
+                    stub.StreamTranscribe(gen_chunks(), metadata=(("user_id", user_id),)),
+                    timeout=30.0,  
+                )
+                await self.log("method invoked successfully")
+                return {"transcript": response.transcript}
+
+            except asyncio.CancelledError:
+                await self.log("[gRPC] Call cancelled due to disconnect")
+                return {"error": "gRPC call cancelled"}
+
+            except asyncio.TimeoutError:
+                await self.log("[gRPC] Call timed out")
+                return {"error": "gRPC call timed out"}
+
+            except grpc.aio.AioRpcError as e:
+                await self.log(f"[gRPC ERROR] {e.code()}: {e.details()}")
+                return {"error": f"gRPC call failed: {e.details()}"}
+
+
     async def listen_llm_responses(self):
-        """
-        Consume LLM responses from 'audio_responses' and forward to this client
-        """
-        channel, _ = get_channel()
-        channel.queue_declare(queue="audio_responses")
+        connection = await get_connection()
+        await self.log(f"[LLM] Connection established: {connection}")
 
-        async def async_callback(body):
-            data = json.loads(body)
-            if data.get("user_id") == self.user_id:
-                await self.send(text_data=json.dumps(data))
+        channel = await connection.channel()
+        await self.log(f"[LLM] Channel opened: {channel}")
 
-        def callback(ch, method, body):
-            asyncio.create_task(async_callback(body))
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-
-        channel.basic_consume(queue="audio_responses", on_message_callback=callback)
-
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, channel.start_consuming)
+        exchange = await channel.declare_exchange(
+            "audio_responses_exchange",
+            aio_pika.ExchangeType.DIRECT,
+            durable=True
+        )
         
+        queue = await channel.declare_queue(exclusive=True)
+        await queue.bind(exchange, routing_key="audio_responses")
+        await self.log(f"[LLM] Queue declared and bound: {queue.name}")
+
+        async with queue.iterator() as it:
+            async for message in it:
+                async with message.process():
+                    data = json.loads(message.body)
+                    await self.log(f"sending the message {data}")
+                    if str(data.get("user_id")) == str(self.user_id):
+                        await self.log(f"sending the message {data}")
+                        await self.send(text_data=json.dumps({
+                            "llmResponse": data.get("response")
+                        }))
+                        
+    async def _log_worker(self):
+        try:
+            while True:
+                msg = await self.log_queue.get()
+                print(msg)
+                await asyncio.sleep(0.05)  
+                self.log_queue.task_done()
+        except asyncio.CancelledError:
+            pass
+        
+    async def log(self, msg):
+        if hasattr(self, "log_queue"):
+            await self.log_queue.put(msg)
+
+
+
     async def disconnect(self, code):
-        print(f"Disconnecting user {self.user_id}, code: {code}")
-        if hasattr(self, "audio_buffer"):
-            self.audio_buffer = b""
+        print(f"Disconnected {self.user_id}, code={code}")
+        
+        if hasattr(self, "log_task"):
+            self.log_task.cancel()
+
+        if hasattr(self, "listen_task"):
+            self.listen_task.cancel()
+
+        self.vad_frame_buffer = np.array([], dtype=np.float32)
+        self.audio_buffer = b""
+        self.in_speech = False
+        self.prob_history.clear()
+
             
     async def cleanup(self):
-        pass
+        self.audio_buffer = b""
+        self.vad_frame_buffer = np.array([], dtype=np.float32)
+        self.in_speech = False
+        self.last_speech_ts = None

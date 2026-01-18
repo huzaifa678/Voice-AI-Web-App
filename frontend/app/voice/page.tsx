@@ -1,11 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useStreamingSTT } from "./hooks/useStreamingSST";
 
 export default function StreamingPage() {
 
-  const accessToken = localStorage.getItem('access-token')
-  const refreshToken = localStorage.getItem('refresh-token')
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAccessToken(localStorage.getItem("access-token"));
+    setRefreshToken(localStorage.getItem("refresh-token"));
+  }, []);
 
   console.log(accessToken)
   console.log(refreshToken)

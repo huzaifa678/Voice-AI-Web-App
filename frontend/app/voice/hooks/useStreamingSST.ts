@@ -10,16 +10,16 @@ export function useStreamingSTT(wsUrl: string, token?: string) {
   const [transcript, setTranscript] = useState<string>("");
   const [llmResponse, setLlmResponse] = useState<string>("");
 
-  const ws = useWebSocket(wsUrl, (event) => {
-    const data = JSON.parse(event.data);
-
-    if (data.transcript) setTranscript(data.transcript);
-    if (data.response || data.llm) setLlmResponse(data.response || data.llm);
+  const recorder = useRecorder((pcmBuffer) => {
+    ws.send(pcmBuffer);
   });
 
-  const recorder = useRecorder((pcmBuffer) => {
-    console.log("Sending audio chunk, size:", pcmBuffer.byteLength);
-    ws.send(pcmBuffer);
+  const ws = useWebSocket(wsUrl, recorder, (event) => {
+    const data = JSON.parse(event.data);
+    if (data.transcript) setTranscript(data.transcript);
+    if (data.llmResponse) {
+      setLlmResponse(data.llmResponse);
+    }
   });
 
   const isExpired = (token?: string) => {

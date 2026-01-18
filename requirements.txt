@@ -20,3 +20,7 @@ soundfile
 django-cors-headers
 daphne
 uvicorn[standard]
+scipy
+aio_pika
+grpcio
+grpcio-tools

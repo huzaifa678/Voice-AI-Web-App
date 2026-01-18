@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package audio;
+
+import "audio.proto";
+
+service AudioService {
+    rpc StreamTranscribe (stream AudioChunk) returns (TranscriptionResponse);
+}

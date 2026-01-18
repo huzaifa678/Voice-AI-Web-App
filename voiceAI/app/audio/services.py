@@ -1,8 +1,62 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import io
+import os
 import tempfile
 import numpy as np
 from pydub import AudioSegment
 from silero_vad import get_speech_timestamps, load_silero_vad
+
+from app.common.rabbit_mq import publish_audio_task
+
+
+executor = ThreadPoolExecutor(max_workers=2)
+
+async def transcribe_audio_bytes(audio_bytes: bytes, user_id: str):
+    if not audio_bytes:
+        raise ValueError("Audio bytes required")
+    
+    print("enter the service body2")
+
+    wav_path = await asyncio.to_thread(
+        AudioService.save_audio_to_wav,
+        audio_bytes,
+        format="webm"
+    )
+    
+    print("enter the service body3")
+
+    try:
+        import soundfile as sf
+        audio_pcm, sr = sf.read(wav_path, dtype="int16")
+        audio_bytes_pcm = audio_pcm.tobytes()
+
+        if not VADService.is_speech(audio_pcm, sample_rate=sr):
+            raise ValueError("No speech detected")
+        
+        print("enter the service body4")
+
+        loop = asyncio.get_running_loop()
+        text = await loop.run_in_executor(
+            executor,
+            AudioService.transcribe_pcm,
+            audio_bytes_pcm,
+            sr
+        )
+
+        if not text.strip():
+            raise ValueError("Empty transcription")
+
+        publish_audio_task(
+            user_id=user_id,
+            audio_bytes=audio_bytes,
+        )
+
+        return {"transcript": text}
+
+    finally:
+        if os.path.exists(wav_path):
+            os.remove(wav_path)
 
 
 class AudioService:
@@ -52,7 +106,7 @@ class AudioService:
     @staticmethod
     def verify_phrase(text: str, expected: str) -> bool:
         return expected.lower() in text.lower()
-
+    
     @classmethod
     def process_audio(cls, audio_pcm: bytes, sample_rate: int = 16000):
         audio = (
@@ -75,8 +129,20 @@ class VADService:
     def model(cls):
         if cls._model is None:
             cls._model = load_silero_vad()
+            cls._model.eval()
         return cls._model
 
+    @staticmethod
+    def speech_prob(audio: np.ndarray, sample_rate=16000) -> float:
+        import torch
+
+        frame = torch.from_numpy(audio).unsqueeze(0)
+        
+        with torch.no_grad():
+            prob = VADService.model()(frame, sample_rate).item()
+
+        return prob
+    
     @staticmethod
     def is_speech(
         audio: np.ndarray,

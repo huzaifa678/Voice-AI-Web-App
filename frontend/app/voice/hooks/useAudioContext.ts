@@ -3,19 +3,36 @@ import { useRef } from "react";
 export function useAudioContext() {
   const ctxRef = useRef<AudioContext | null>(null);
 
-  const getContext = async () => {
+  const createContext = async () => {
+    if (ctxRef.current) {
+      await ctxRef.current.close();
+      ctxRef.current = null;
+    }
+
+    const ctx = new AudioContext({ sampleRate: 16000 });
+    await ctx.audioWorklet.addModule("/audio/pcm-processor.js");
+
+    console.log("AudioContext created, sampleRate =", ctx.sampleRate);
+
+    ctxRef.current = ctx;
+    return ctx;
+  };
+
+  const getContext = () => {
     if (!ctxRef.current) {
-      const ctx = new AudioContext({ sampleRate: 16000 });
-      await ctx.audioWorklet.addModule("/audio/pcm-processor.js");
-      ctxRef.current = ctx;
+      throw new Error("AudioContext not initialized. Call createContext first.");
     }
     return ctxRef.current;
   };
 
-  const close = async () => {
-    await ctxRef.current?.close();
-    ctxRef.current = null;
+  const closeContext = async () => {
+    if (ctxRef.current) {
+      await ctxRef.current.close();
+      ctxRef.current = null;
+      console.log("AudioContext closed");
+    }
   };
 
-  return { getContext, close };
+  return { createContext, getContext, closeContext };
 }
+
