@@ -2,18 +2,21 @@ version: "3.9"
 
 services:
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: voice-ai-web:latest
     container_name: voice-ai-web
-    command: chmod +x voiceAI/start.sh
-      ./voiceAI/start.sh
-    volumes:
-      - .:/app
+    command: >
+      sh -c "
+      ./wait-for-it.sh postgres:5432 --strict --timeout=60 &&
+      ./wait-for-it.sh redis:6379 --strict --timeout=60 &&
+      ./wait-for-it.sh rabbitmq:5672 --strict --timeout=60 &&
+      ./start.sh
+      "
+
+    working_dir: /app/voiceAI
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - .env.docker
     depends_on:
       - postgres
       - redis
