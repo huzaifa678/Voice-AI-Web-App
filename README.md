@@ -29,3 +29,37 @@
 * **Redis:** Used for rate limiting the API requests to the Backend
   
 * **Docker:** Used for containerzing the Web Application and for starting and running the DB, Message Queue and API rate limiter containers
+
+## Guidelines for starting with the web app
+
+* **Configuration:** Create the .env file and Configure the GROQ API key for model based on your generated API key
+
+* **pre-requisites:**
+     * ensure the python interpeter version 3.11 or above is installed
+       
+     * ensure Docker is installed on the machine
+       
+
+* **Starting the Backend server:** to start the Backend server follow these commands:
+    ```bash
+    cd voiceAI #from root
+    ```
+    ```bash
+    chmod +x start.sh
+    ./start.sh
+    ```
+
+  * **Starting the Frontend server:** start the Frontend server by following these commands:
+       ```bash
+       cd frontend
+       bun run dev
+       ```
+
+  * **Running the Docker Containers:** Access the Docker Compose file and run the services seperately for creating and running the           Postgres,          Redis and RabbitMQ container.
+
+     If you want to use the containerized Backend instead of starting the Backend from the terminal just follow this command
+
+     ```bash
+     docker compose up -d
+     ```
+
