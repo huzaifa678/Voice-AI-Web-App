@@ -24,3 +24,6 @@ scipy
 aio_pika
 grpcio
 grpcio-tools
+pytest
+pytest-django
+pytest-asyncio
