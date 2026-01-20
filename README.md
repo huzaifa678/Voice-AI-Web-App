@@ -42,24 +42,24 @@
 
 * **Starting the Backend server:** to start the Backend server follow these commands:
     ```bash
-    cd voiceAI #from root
+    cd voiceAI 
     ```
     ```bash
     chmod +x start.sh
     ./start.sh
     ```
 
-  * **Starting the Frontend server:** start the Frontend server by following these commands:
-       ```bash
-       cd frontend
-       bun run dev
-       ```
+* **Starting the Frontend server:** start the Frontend server by following these commands:
+    ```bash
+    cd frontend
+    bun run dev
+    ```
 
-  * **Running the Docker Containers:** Access the Docker Compose file and run the services seperately for creating and running the           Postgres,          Redis and RabbitMQ container.
+* **Running the Docker Containers:** Access the Docker Compose file and run the services seperately for creating and running the          Postgres,          Redis and RabbitMQ container.
 
-     If you want to use the containerized Backend instead of starting the Backend from the terminal just follow this command
+    If you want to use the containerized Backend instead of starting the Backend from the terminal just follow this command
 
-     ```bash
-     docker compose up -d
-     ```
+    ```bash
+    docker compose up -d
+    ```
 
