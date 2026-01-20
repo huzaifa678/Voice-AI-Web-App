@@ -47,10 +47,6 @@ async def test_handle_email_message_success(mock_send_mail):
     assert "Hello testuser" in args[1]
     assert ["test@example.com"] == args[3]
 
-
-# ---------------------------
-# Audio Handler Success Test
-# ---------------------------
 @pytest.mark.asyncio
 @patch("app.workers.task_audio.AudioService.process_audio")  # sync function
 @patch("app.workers.task_audio.LLMService.query_from_text_async", new_callable=AsyncMock)
@@ -70,9 +66,6 @@ async def test_handle_message_success(mock_publish, mock_llm, mock_audio):
     message.ack.assert_called_once()
 
 
-# ---------------------------
-# Audio Empty Text Test
-# ---------------------------
 @pytest.mark.asyncio
 @patch("app.workers.task_audio.AudioService.process_audio")
 async def test_handle_message_empty_audio(mock_audio):
@@ -87,9 +80,6 @@ async def test_handle_message_empty_audio(mock_audio):
     message.ack.assert_called_once()
 
 
-# ---------------------------
-# Audio Exception Test
-# ---------------------------
 @pytest.mark.asyncio
 @patch("app.workers.task_audio.AudioService.process_audio")
 @patch("app.workers.task_audio.LLMService.query_from_text_async", new_callable=AsyncMock)
