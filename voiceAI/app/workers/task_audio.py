@@ -50,4 +50,5 @@ async def main():
     print(" Press CTRL + C to exit")
     await asyncio.Future()  
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

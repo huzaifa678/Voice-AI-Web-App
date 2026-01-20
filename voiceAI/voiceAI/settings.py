@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -50,6 +50,17 @@ INSTALLED_APPS = [
     "app",
     "corsheaders",
 ]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
+}
+
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -119,6 +130,20 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+import sys
+
+if "test" in sys.argv:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
+
+    LOGGING = {}
+
+    EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 
 # Password validation

@@ -63,3 +63,6 @@ async def main():
     print(" [*] Waiting for email tasks")
     print(" Press CTRL + C to exit")
     await asyncio.Future()  
+    
+if __name__ == "__main__":
+    asyncio.run(main())
