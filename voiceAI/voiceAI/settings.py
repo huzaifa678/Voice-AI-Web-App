@@ -115,7 +115,7 @@ DATABASES = {
         'NAME': 'voice_ai_db',
         'USER': 'postgres',
         'PASSWORD': 'postgres',
-        'HOST': 'postgres',
+        'HOST': 'localhost',
         'PORT': '5432',
     }
 }
