@@ -7,6 +7,8 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    python3-dev \
+    libffi-dev \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
@@ -30,6 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*
+RUN pip install --no-cache-dir "uvicorn[standard]"
+
 
 COPY . .
 
