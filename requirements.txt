@@ -27,3 +27,5 @@ grpcio-tools
 pytest
 pytest-django
 pytest-asyncio
+celery
+django-celery-results

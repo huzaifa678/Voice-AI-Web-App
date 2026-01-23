@@ -11,7 +11,6 @@ services:
       ./wait-for-it.sh rabbitmq:5672 --strict --timeout=60 &&
       ./start.sh
       "
-
     working_dir: /app/voiceAI
     ports:
       - "8000:8000"
@@ -37,6 +36,22 @@ services:
       - "5432:5432"
     networks:
       - voice-ai-net
+
+  celery:
+    image: voice-ai-web:latest
+    container_name: voice-ai-celery
+    command: celery -A app.common.celery worker -l info
+    env_file:
+      - .env.docker
+    depends_on:
+      - rabbitmq
+      - redis
+      - postgres
+    networks:
+      - voice-ai-net
+    working_dir: /app/voiceAI
+
+
 
   redis:
     image: redis:7

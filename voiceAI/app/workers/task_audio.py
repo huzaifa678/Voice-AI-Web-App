@@ -1,54 +1,34 @@
-import asyncio
+from celery import shared_task
 import base64
-import json
-import aio_pika
-
+import asyncio
 from app.audio.services import AudioService
 from app.llm.services import LLMService
-from app.common.rabbit_mq import get_connection, publish_audio_response 
+from app.common.rabbit_mq import publish_audio_response
 
-async def handle_message(message: aio_pika.IncomingMessage):
-    payload = json.loads(message.body)
+@shared_task(autoretry_for=(Exception,), retry_kwargs={"max_retries": 3, "countdown": 5})
+def handle_audio_task(payload: dict):
+    """
+    Celery task to process audio messages.
+    payload: dict containing 'user_id' and 'audio_bytes'
+    """
+    audio_bytes = base64.b64decode(payload["audio_bytes"])
 
-    try:
-        audio_bytes = base64.b64decode(payload["audio_bytes"])
-        
-        print("inside the handle message method")
+    print("inside the handle audio task")
 
-        text = await asyncio.to_thread(
-            AudioService.process_audio,
-            audio_bytes
-        )
+    text = asyncio.run(asyncio.to_thread(AudioService.process_audio, audio_bytes))
 
-        if not text.strip():
-            await message.ack()
-            return
+    if not text.strip():
+        return
 
-        response = await LLMService.query_from_text_async(text=text)
-        
-        print("LLM response: ", response)
+    response = asyncio.run(LLMService.query_from_text_async(text=text))
 
-        await publish_audio_response(
+    print("LLM response: ", response)
+
+    asyncio.run(
+        publish_audio_response(
             user_id=payload.get("user_id"),
             response=response
         )
+    )
 
-        await message.ack()
 
-    except Exception as e:
-        await message.nack(requeue=False)
-        raise
-    
-async def main():
-    connection = await get_connection()
-    channel = await connection.channel()
-    queue = await channel.declare_queue("audio_tasks", durable=True)
-
-    await queue.consume(handle_message)
-    
-    print("[*] Waiting for email tasks")
-    print(" Press CTRL + C to exit")
-    await asyncio.Future()  
-
-if __name__ == "__main__":
-    asyncio.run(main())

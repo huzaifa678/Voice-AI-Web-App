@@ -1,11 +1,12 @@
 import asyncio
+import base64
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import grpc
 from app.audio.services import AudioService, VADService
-from app.common.rabbit_mq import publish_audio_task
 from app.common.rate_limit import rate_limit
 from app.grpc import audio_pb2, service_pb2_grpc
+from app.workers.task_audio import handle_audio_task
 
 executor = ThreadPoolExecutor(max_workers=4)
 
@@ -53,7 +54,11 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
         
         print("executors running")
 
-        await publish_audio_task(user_id=user_id, audio_bytes=audio_bytes)
+        handle_audio_task.delay({
+            "user_id": user_id,
+            "audio_bytes": base64.b64encode(audio_bytes).decode()
+        })
+        
         print("task published")
 
         return audio_pb2.TranscriptionResponse(transcript=transcript or "")

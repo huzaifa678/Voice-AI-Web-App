@@ -13,7 +13,7 @@ def api_client():
 class TestAuthViews:
 
     @patch("app.auth.views.AuthService.register")
-    @patch("app.auth.views.publish_email_task")
+    @patch("app.auth.views.handle_email_message.delay")
     def test_register_success(self, mock_publish_email, mock_register, api_client):
         mock_user = MagicMock()
         mock_user.username = "testuser"
@@ -34,7 +34,6 @@ class TestAuthViews:
         mock_publish_email.assert_called_once_with({
             "to_email": mock_user.email,
             "subject": "Welcome to VoiceAI!",
-            "template": "welcome_email",
             "context": {"username": mock_user.username}
         })
 

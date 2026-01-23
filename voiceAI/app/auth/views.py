@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from app.serializers.register_serializer import RegisterSerializer
 from app.serializers.login_serializer import LoginSerializer
 from app.serializers.refresh_serializer import RefreshSerializer
-from app.common.rabbit_mq import publish_email_task
+from app.workers.task_email import handle_email_message
 from .services import AuthService
 
 User = get_user_model()
@@ -22,13 +22,11 @@ class RegisterView(APIView):
                     password=serializer.validated_data['password'],
                 )   
                 
-                publish_email_task({
+                handle_email_message.delay({
                     "to_email": user.email,
                     "subject": "Welcome to VoiceAI!",
-                    "template": "welcome_email", 
-                    "context": {
-                    "username": user.username
-                }})
+                    "context": {"username": user.username}
+                })
                 
                 return Response({"detail": "User created successfully"}, status=status.HTTP_201_CREATED)
             except ValueError as e:

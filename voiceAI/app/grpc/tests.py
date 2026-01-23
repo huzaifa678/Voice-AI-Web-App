@@ -1,6 +1,6 @@
 import grpc
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from app.grpc.service import AudioServicer
 from app.grpc import audio_pb2
 
@@ -32,7 +32,7 @@ async def test_stream_transcribe_success():
 
     with patch("app.grpc.service.VADService.is_speech", return_value=True) as mock_vad, \
          patch("app.grpc.service.AudioService.transcribe_pcm", return_value="hello world") as mock_transcribe, \
-         patch("app.grpc.service.publish_audio_task", new_callable=AsyncMock) as mock_publish, \
+         patch("app.grpc.service.handle_audio_task.delay", new_callable=MagicMock) as mock_delay, \
          patch("app.grpc.service.rate_limit", return_value=None):
 
         async def request_gen():
@@ -45,7 +45,7 @@ async def test_stream_transcribe_success():
         assert response.transcript == "hello world"
         mock_vad.assert_called_once()
         mock_transcribe.assert_called_once_with(SAMPLE_AUDIO_BYTES, 16000)
-        mock_publish.assert_awaited_once()
+        mock_delay.assert_called_once()
         assert context.code is None
         assert context.details is None
 
