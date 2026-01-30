@@ -8,6 +8,11 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
 """
 
 import os
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'voiceAI.settings')
+import django
+django.setup()
+
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
@@ -16,11 +21,6 @@ from app.audio.routing import websocket_urlpatterns
 from app.grpc import audio_pb2_grpc
 from app.grpc.service import AudioServicer
 from app.grpc import service_pb2_grpc
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'voiceAI.settings')
-
-import django
-django.setup()
 
 from app.middleware.jwt_middleware import JWTAuthMiddleware
 
