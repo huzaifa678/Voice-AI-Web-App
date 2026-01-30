@@ -121,13 +121,14 @@ WSGI_APPLICATION = 'voiceAI.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'voice_ai_db',
-        'USER': 'postgres',
-        'PASSWORD': 'postgres',
-        'HOST': 'localhost',
-        'PORT': '5432',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "voice_ai_db",
+        "USER": "postgres",
+        "PASSWORD": "postgres",
+        "HOST": "pgbouncer",  
+        "PORT": "6432",
+        "CONN_MAX_AGE": 0,   
     }
 }
 
