@@ -98,7 +98,6 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
             await publish_audio_task(
                 user_id=str(user.id) if user else None,
                 audio_bytes=audio_bytes,
-                session_id=str(session.id),
             )
 
             return audio_pb2.TranscriptionResponse(
