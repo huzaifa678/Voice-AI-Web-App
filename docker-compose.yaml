@@ -45,6 +45,8 @@ services:
       - postgres
     ports:
       - "6432:6432"
+    networks:
+      - voice-ai-net
     volumes:
       - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini
       - ./pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt
