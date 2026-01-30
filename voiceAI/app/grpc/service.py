@@ -6,8 +6,12 @@ from app.audio.services import AudioService, VADService
 from app.common.rabbit_mq import publish_audio_task
 from app.common.rate_limit import rate_limit
 from app.grpc import audio_pb2, service_pb2_grpc
+from django.contrib.auth import get_user_model
+
+from app.models import AudioSession
 
 executor = ThreadPoolExecutor(max_workers=4)
+User = get_user_model()
 
 
 class AudioServicer(service_pb2_grpc.AudioServiceServicer):
@@ -47,13 +51,64 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
             return audio_pb2.TranscriptionResponse(transcript="")
 
         loop = asyncio.get_running_loop()
-        transcript = await loop.run_in_executor(
-            executor, AudioService.transcribe_pcm, audio_bytes, 16000
+        user = None
+        if user_id:
+            user = await loop.run_in_executor(
+                None,
+                lambda: User.objects.filter(id=user_id).first()
+            )
+
+        session = await loop.run_in_executor(
+            None,
+            lambda: AudioSession.objects.create(user=user)
         )
-        
-        print("executors running")
 
-        await publish_audio_task(user_id=user_id, audio_bytes=audio_bytes)
-        print("task published")
+        try:
+            await loop.run_in_executor(
+                None,
+                rate_limit,
+                f"audio-transcribe:{user_id or 'anonymous'}",
+                30,
+                60,
+            )
 
-        return audio_pb2.TranscriptionResponse(transcript=transcript or "")
+            if not VADService.is_speech(audio_np, sample_rate=16000):
+                session.mark_completed("")
+                return audio_pb2.TranscriptionResponse(transcript="")
+
+            await loop.run_in_executor(
+                None,
+                lambda: AudioSession.objects.filter(id=session.id)
+                .update(status=AudioSession.Status.PROCESSING)
+            )
+
+            transcript = await loop.run_in_executor(
+                executor,
+                AudioService.transcribe_pcm,
+                audio_bytes,
+                16000
+            )
+
+            await loop.run_in_executor(
+                None,
+                session.mark_completed,
+                transcript or ""
+            )
+
+            await publish_audio_task(
+                user_id=str(user.id) if user else None,
+                audio_bytes=audio_bytes,
+                session_id=str(session.id),
+            )
+
+            return audio_pb2.TranscriptionResponse(
+                transcript=transcript or ""
+            )
+
+        except Exception as e:
+            await loop.run_in_executor(
+                None,
+                session.mark_failed,
+                str(e)
+            )
+            raise
