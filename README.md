@@ -14,7 +14,7 @@
 
 ## Tech stack:
 
-* **Django:** As the Backend Framework for defining the api endpoints for the REST server, configuring the Websocket server and the gRPC server for graceful handling and starting the all three servers via the addition of uvicorn server
+* **Django:** As the Backend Framework for defining the api endpoints for the REST server, configuring the REST server, Websocket server and the gRPC server for startup logic and graceful shutdown, setting variables for the RabbitMQ email worker to use and starting all three servers via the addition of uvicorn server
   
 * **Whisper AI:** As the AI model for converting audio to text
   
