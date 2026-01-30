@@ -14,7 +14,7 @@
 
 ## Tech stack:
 
-* **Django:** As the Backend Framework for running both REST, Websocket and the gRPC server via the addition of uvicorn server
+* **Django:** As the Backend Framework for defining the api endpoints for the REST server, configuring the Websocket server and the gRPC server for graceful handling and starting the all three servers via the addition of uvicorn server
   
 * **Whisper AI:** As the AI model for converting audio to text
   
