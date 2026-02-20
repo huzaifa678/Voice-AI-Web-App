@@ -17,7 +17,7 @@ load_dotenv()
 
 User = get_user_model()
 
-REFRESH_TOKEN_LIFETIME = parse_timedelta(os.getenv("REFRESH_TOKEN_LIFETIME"))
+REFRESH_TOKEN_LIFETIME = parse_timedelta(os.getenv("REFRESH_TOKEN_LIFETIME", "7d"))
 
 class AuthService:
     

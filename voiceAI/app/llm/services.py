@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class LLMService:
-    API_KEY = os.getenv("GROQ_API_KEY")
+    API_KEY = os.getenv("GROQ_API_KEY", "")
     ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
 
     @staticmethod

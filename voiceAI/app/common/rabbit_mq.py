@@ -15,7 +15,7 @@ def get_channel():
     if _connection and _connection.is_open:
         return _channel, _connection
 
-    params = pika.URLParameters(os.getenv("RABBITMQ_URL"))
+    params = pika.URLParameters(os.getenv("RABBITMQ_URL", ""))
     _connection = pika.BlockingConnection(params)
     _channel = _connection.channel()
     return _channel, _connection
