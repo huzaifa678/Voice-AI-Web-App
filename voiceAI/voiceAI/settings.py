@@ -134,7 +134,11 @@ DATABASES = {
 
 import sys
 
-if os.environ.get("DJANGO_TEST"):
+IS_TEST = os.getenv("DJANGO_TEST") == "true"
+IS_CI = os.getenv("CI") == "true"
+
+
+if IS_TEST or IS_CI:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
