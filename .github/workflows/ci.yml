@@ -17,11 +17,11 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: voice_ai_db
+          POSTGRES_DB: voice_ai_test_db
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d voice_ai_db"
+          --health-cmd "pg_isready -U postgres -d voice_ai_test_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -33,7 +33,7 @@ jobs:
 
     env:
       DJANGO_SETTINGS_MODULE: voiceAI.settings
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/voice_ai_db
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/voice_ai_test_db
       REDIS_URL: redis://localhost:6379/0
       CI: "true"
       DJANGO_TEST: "true"
