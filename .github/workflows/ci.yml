@@ -10,6 +10,25 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: voice_ai_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d voice_ai_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DJANGO_SETTINGS_MODULE: voiceAI.settings
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/voice_ai_db
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -27,6 +46,7 @@ jobs:
       - name: Run migrations
         run: |
           python manage.py migrate
+        working-directory: voiceAI
 
       - name: Run tests
         run: |

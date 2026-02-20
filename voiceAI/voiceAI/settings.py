@@ -134,17 +134,29 @@ DATABASES = {
 
 import sys
 
-if os.environ.get("DJANGO_TEST") == "true":
+if os.environ.get("DJANGO_TEST"):
     DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": ":memory:",
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'voice_ai_test_db',
+            'USER': 'postgres',
+            'PASSWORD': 'postgres',
+            'HOST': 'localhost',
+            'PORT': '5432',  # skip PgBouncer
         }
     }
 
-    LOGGING = {}
+# if os.environ.get("DJANGO_TEST") == "true":
+#     DATABASES = {
+#         "default": {
+#             "ENGINE": "django.db.backends.sqlite3",
+#             "NAME": ":memory:",
+#         }
+#     }
 
-    EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+#     LOGGING = {}
+
+#     EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 
 # Password validation
