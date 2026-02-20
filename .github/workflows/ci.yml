@@ -51,3 +51,4 @@ jobs:
       - name: Run tests
         run: |
           DJANGO_TEST=true pytest -v
+        working-directory: voiceAI
