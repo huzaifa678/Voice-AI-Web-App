@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from urllib.parse import quote
 import numpy as np
 import pytest
@@ -10,9 +11,9 @@ import soundfile as sf
 TARGET_SR = 16000
 INT16_MAX = 32767
 
-HTTP_BASE = "http://localhost:8000/api"
-HTTP_BASE_HEALTH = "http://localhost:8000"
-WS_URL = "ws://localhost:8000/ws/audio/"
+HTTP_BASE = os.getenv("HTTP_BASE", "http://localhost:8000/api")
+HTTP_BASE_HEALTH = os.getenv("HTTP_BASE_HEALTH", "http://localhost:8000")
+WS_URL = os.getenv("WS_URL", "ws://localhost:8000/ws/audio/")
 
 async def wait_for_server():
     async with httpx.AsyncClient() as client:

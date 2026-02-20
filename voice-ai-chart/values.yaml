@@ -1,0 +1,37 @@
+replicaCount: 1
+
+image:
+  repository: huzaifagill234/voice-ai-web
+  tag: latest
+  pullPolicy: IfNotPresent
+
+env:
+  POSTGRES_HOST: postgresql
+  POSTGRES_DB: voice_ai_db
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  REDIS_HOST: redis-master
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_USER: guest
+  RABBITMQ_PASSWORD: guest
+  GOOGLE_USER_EMAIL: voiceai3004@gmail.com
+  GOOGLE_APP_PASSWORD: tgejdjpjaoywbyng
+
+postgresql:
+  auth:
+    username: postgres
+    password: postgres
+    database: voice_ai_db
+
+redis:
+  auth:
+    enabled: false
+
+rabbitmq:
+  auth:
+    username: guest
+    password: guest
+
+service:
+  type: ClusterIP
+  port: 8000

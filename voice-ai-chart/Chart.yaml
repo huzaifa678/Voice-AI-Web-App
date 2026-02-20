@@ -1,0 +1,17 @@
+apiVersion: v2
+name: voice-ai
+description: Voice AI app with official Redis, RabbitMQ, Postgres charts
+type: application
+version: 0.1.0
+appVersion: "latest"
+
+dependencies:
+  - name: redis
+    version: "17.9.3" 
+    repository: "https://charts.bitnami.com/bitnami" 
+  - name: rabbitmq
+    version: "16.0.14"  
+    repository: "https://charts.bitnami.com/bitnami" 
+  - name: postgresql
+    version: "18.4.0" 
+    repository: "https://charts.bitnami.com/bitnami" 

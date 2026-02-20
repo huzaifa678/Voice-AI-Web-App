@@ -134,7 +134,7 @@ DATABASES = {
 
 import sys
 
-if "test" in sys.argv:
+if os.environ.get("DJANGO_TEST") == "true":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
