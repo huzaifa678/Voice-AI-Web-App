@@ -89,20 +89,11 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
 
             print("STARTING TRANSCRIPTION")
             
-            if ENVIRONMENT == "local":
-                transcript = await loop.run_in_executor(
-                    executor,
-                    AudioService.transcribe_pcm,
-                    audio_bytes,
-                    16000
-                )
-                print("STARTING RECIEVED")
-            else:
-                transcript = await AudioService.transcribe_pcm(
-                    audio_bytes,
-                    16000
-                )
-                print("STARTING TRANSCRIPTION")
+            transcript = await AudioService.transcribe_pcm(
+                audio_bytes,
+                16000
+            )
+            print("STARTING TRANSCRIPTION")
 
             await loop.run_in_executor(
                 None,

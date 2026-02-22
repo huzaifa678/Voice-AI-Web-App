@@ -43,7 +43,7 @@ async def test_stream_transcribe_success():
     servicer = AudioServicer()
 
     with patch("app.grpc.service.VADService.is_speech", return_value=True) as mock_vad, \
-         patch("app.grpc.service.AudioService.transcribe_pcm", return_value="hello world") as mock_transcribe, \
+         patch("app.grpc.service.AudioService.transcribe_pcm", new_callable=AsyncMock, return_value="hello world") as mock_transcribe, \
          patch("app.grpc.service.publish_audio_task", new_callable=AsyncMock) as mock_publish, \
          patch("app.grpc.service.rate_limit", return_value=None):
 
