@@ -30,12 +30,6 @@ async def wait_for_server():
 @pytest.mark.asyncio
 async def test_audio_flow_e2e_smoke():
     await wait_for_server()
-    
-    http_base = os.environ["HTTP_BASE"]
-    ws_base = os.environ["WS_URL"]
-    
-    print("HTTP_BASE =", http_base)
-    print("WS_URL =",ws_base)
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -65,10 +59,11 @@ async def test_audio_flow_e2e_smoke():
         print(type(access_token))
         
         
-    ws_url = f"{ws_base}?token={quote(access_token)}"
+    base_ws = os.getenv("WS_URL", "ws://localhost:8000/ws/audio/")
+    WS_URL = f"{base_ws}?token={quote(access_token)}"
     
     async with connect(
-        ws_url,
+        WS_URL,
         max_size=10 * 1024 * 1024,
     ) as websocket:
         pcm, sr = sf.read("fixtures/test.wav", dtype="int16")
@@ -95,11 +90,11 @@ async def test_audio_flow_e2e_smoke():
 
         transcript_received = False
         llm_received = False
-        deadline = asyncio.get_event_loop().time() + 120
+        deadline = asyncio.get_event_loop().time() + 60
 
         while asyncio.get_event_loop().time() < deadline:
             try:
-                msg = await asyncio.wait_for(websocket.recv(), timeout=15)
+                msg = await asyncio.wait_for(websocket.recv(), timeout=5)
             except asyncio.TimeoutError:
                 continue
 

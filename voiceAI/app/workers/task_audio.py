@@ -8,6 +8,7 @@ from app.llm.services import LLMService
 from app.common.rabbit_mq import get_connection, publish_audio_response 
 
 async def handle_message(message: aio_pika.IncomingMessage):
+    print("RAW MESSAGE RECEIVED:", message.body)
     payload = json.loads(message.body)
 
     try:
@@ -46,7 +47,7 @@ async def main():
 
     await queue.consume(handle_message)
     
-    print("[*] Waiting for email tasks")
+    print("[*] Waiting for audio tasks")
     print(" Press CTRL + C to exit")
     await asyncio.Future()  
 

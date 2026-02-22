@@ -29,10 +29,15 @@ SECRET_KEY = 'django-insecure-&j*0*buq9ex!mezwm(cr6&hx6u_5ye&g0_4ah132jqxx@$mo59
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-]
+ALLOWED_HOSTS = os.getenv(
+    "ALLOWED_HOSTS",
+    "*"
+).split(",")
+
+# ALLOWED_HOSTS = [
+#     "localhost",
+#     "127.0.0.1",
+# ]
 
 ASGI_APPLICATION = "voiceAI.asgi.application"
 
@@ -126,8 +131,8 @@ DATABASES = {
         "NAME": "voice_ai_db",
         "USER": "postgres",
         "PASSWORD": "postgres",
-        "HOST": "localhost",  
-        "PORT": "6432",
+        "HOST": os.getenv("POSTGRES_HOST", "localhost"),  
+        "PORT": os.getenv("POSTGRES_PORT", 6432),
         "CONN_MAX_AGE": 0,   
     }
 }
@@ -149,18 +154,25 @@ if IS_TEST or IS_CI:
             'PORT': '5432',  # skip PgBouncer
         }
     }
+    
+    EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
-# if os.environ.get("DJANGO_TEST") == "true":
-#     DATABASES = {
-#         "default": {
-#             "ENGINE": "django.db.backends.sqlite3",
-#             "NAME": ":memory:",
-#         }
-#     }
+# for running tests in the local environment
+if os.environ.get("DJANGO_TEST") == "true":
+    DATABASES = {
+        "default": {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'voice_ai_test_db',
+            'USER': 'postgres',
+            'PASSWORD': 'postgres',
+            'HOST': 'localhost',
+            'PORT': '5432',  
+        }
+    }
 
-#     LOGGING = {}
+    LOGGING = {}
 
-#     EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 
 # Password validation

@@ -1,21 +1,42 @@
 replicaCount: 1
 
+grpc:
+  replicaCount: 1
+
+audioWorker:
+  replicaCount: 1
+
 image:
   repository: huzaifagill234/voice-ai-web
-  tag: latest
-  pullPolicy: IfNotPresent
+  tag: ci
+  imagePullPolicy: Always
+
+e2e:
+  image:
+    repository: huzaifagill234/e2e-runner
+    tag: ci       
+    pullPolicy: IfNotPresent
+  env:
+    HTTP_BASE: "http://voice-ai:8000/api"
+    HTTP_BASE_HEALTH: "http://voice-ai:8000"
+    WS_URL: "ws://voice-ai:8000/ws/audio/"
 
 env:
-  POSTGRES_HOST: postgresql
+  POSTGRES_HOST: voice-ai-postgresql
   POSTGRES_DB: voice_ai_db
+  POSTGRES_PORT: 5432
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
-  REDIS_HOST: redis-master
-  RABBITMQ_HOST: rabbitmq
+  REDIS_HOST: voice-ai-redis-master
+  REDIS_URL: redis://voice-ai-redis-master:6379/0
+  RABBITMQ_HOST: voice-ai-rabbitmq
   RABBITMQ_USER: guest
   RABBITMQ_PASSWORD: guest
+  RABBITMQ_URL: amqp://guest:guest@voice-ai-rabbitmq:5672/
   GOOGLE_USER_EMAIL: voiceai3004@gmail.com
-  GOOGLE_APP_PASSWORD: tgejdjpjaoywbyng
+  ALLOWED_HOSTS: "voice-ai,voice-ai.default.svc.cluster.local,localhost,127.0.0.1"
+  GRPC_DEPLOYMENT_TYPE: remote
+  ENVIRONMENT: infra-test
 
 postgresql:
   auth:
@@ -24,10 +45,16 @@ postgresql:
     database: voice_ai_db
 
 redis:
+  image:
+    repository: bitnamilegacy/redis
+    tag: 7.2.4-debian-12-r9
   auth:
     enabled: false
 
 rabbitmq:
+  image:
+    repository: bitnamilegacy/rabbitmq
+    tag: 3.12.12-debian-11-r8
   auth:
     username: guest
     password: guest

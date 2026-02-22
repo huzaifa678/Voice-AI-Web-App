@@ -14,12 +14,23 @@ spec:
       labels:
         app: {{ include "voice-ai.name" . }}
     spec:
+      initContainers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /app/voiceAI
+          command: ["sh", "-c", "./wait-for-it.sh {{ .Values.env.POSTGRES_HOST }}:{{ .Values.env.POSTGRES_PORT }} --strict --timeout=60 && python manage.py migrate --noinput"]
+          env:
+            {{- range $key, $value := .Values.env}}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
       containers:
         - name: voice-ai-web
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           workingDir: /app/voiceAI
-          command: ["sh", "-c", "./start.sh"]
+          command: ["sh", "-c", "./k8s-start.sh"]
           env: 
             {{- range $key, $value := .Values.env}}
             - name: {{ $key }}
@@ -31,5 +42,81 @@ spec:
             httpGet:
               path: /health/
               port: 8000
+              httpHeaders:
+                - name: Host
+                  value: voice-ai
             initialDelaySeconds: 10
             periodSeconds: 5
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "voice-ai-grpc.fullname" . }}
+  labels:
+    app: {{ include "voice-ai-grpc.name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "voice-ai-grpc.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "voice-ai-grpc.name" . }}
+    spec:
+      containers:
+        - name: voice-ai-grpc
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /app/voiceAI
+          command: ["sh", "-c", "./wait-for-it.sh {{ .Values.env.RABBITMQ_HOST }}:5672 --strict --timeout=120 &&./grpc-start.sh"]
+          env:
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          ports:
+            - containerPort: 50051
+          readinessProbe:
+            tcpSocket:
+              port: 50051
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "voice-ai-audio-worker.fullname" . }}
+  labels:
+    app: {{ include "voice-ai-audio-worker.name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "voice-ai-audio-worker.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "voice-ai-audio-worker.name" . }}
+    spec:
+      containers:
+        - name: voice-ai-audio-worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /app/voiceAI
+          command:
+          - "sh"
+          - "-c"
+          - >
+            export GROQ_API_KEY=$(grep '^GROQ_API_KEY=' /app/.env.docker | cut -d '=' -f2) &&
+            ./wait-for-it.sh {{ .Values.env.RABBITMQ_HOST }}:5672 --strict --timeout=120 &&
+            python -m app.workers.task_audio
+          env:
+            {{- range $key, $value := .Values.env }}
+            {{- if $value }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+      restartPolicy: Always

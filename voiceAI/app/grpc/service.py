@@ -1,5 +1,6 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import os
 import numpy as np
 import grpc
 from app.audio.services import AudioService, VADService
@@ -12,7 +13,7 @@ from app.models import AudioSession
 
 executor = ThreadPoolExecutor(max_workers=4)
 User = get_user_model()
-
+ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
 class AudioServicer(service_pb2_grpc.AudioServiceServicer):
     """
@@ -64,6 +65,7 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
         )
 
         try:
+            print("RATE LIMIT CHECK 1")
             await loop.run_in_executor(
                 None,
                 rate_limit,
@@ -71,9 +73,12 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
                 30,
                 60,
             )
+            print("RATE LIMIT CHECK 2")
 
-            if not VADService.is_speech(audio_np, sample_rate=16000):
-                session.mark_completed("")
+            vad_result = VADService.is_speech(audio_np, sample_rate=16000)
+            print("VAD RESULT:", vad_result)
+
+            if not vad_result:
                 return audio_pb2.TranscriptionResponse(transcript="")
 
             await loop.run_in_executor(
@@ -82,12 +87,22 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
                 .update(status=AudioSession.Status.PROCESSING)
             )
 
-            transcript = await loop.run_in_executor(
-                executor,
-                AudioService.transcribe_pcm,
-                audio_bytes,
-                16000
-            )
+            print("STARTING TRANSCRIPTION")
+            
+            if ENVIRONMENT == "local":
+                transcript = await loop.run_in_executor(
+                    executor,
+                    AudioService.transcribe_pcm,
+                    audio_bytes,
+                    16000
+                )
+                print("STARTING RECIEVED")
+            else:
+                transcript = await AudioService.transcribe_pcm(
+                    audio_bytes,
+                    16000
+                )
+                print("STARTING TRANSCRIPTION")
 
             await loop.run_in_executor(
                 None,
@@ -95,10 +110,12 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
                 transcript or ""
             )
 
+            print("ABOUT TO PUBLISH AUDIO TASK")
             await publish_audio_task(
                 user_id=str(user.id) if user else None,
                 audio_bytes=audio_bytes,
             )
+            print("PUBLISHED AUDIO TASK")
 
             return audio_pb2.TranscriptionResponse(
                 transcript=transcript or ""

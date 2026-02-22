@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 import json
 import aio_pika
@@ -135,10 +136,17 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
             return
         
         try:
-            await self.log("calling the grpc method")
-            response = await self.send_to_grpc(self.audio_buffer)
+            grpc_type = os.getenv("GRPC_DEPLOYMENT_TYPE", "local").lower()
+            if grpc_type == "remote":
+                await self.log("[gRPC] Using separate deployment method")
+                response = await self.send_to_grpc_separate(self.audio_buffer)
+            else:
+                await self.log("[gRPC] Using local deployment method")
+                response = await self.send_to_grpc(self.audio_buffer)
+
             await self.send(text_data=json.dumps(response))
-            await self.log("called the grpc method")
+            await self.log("called the grpc method successfully")
+
         except Exception as e:
             await self.send(text_data=json.dumps({"error": str(e)}))
 
@@ -151,6 +159,48 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
         #     await self.send(text_data=json.dumps(result))
         # except Exception as e:
         #     await self.send(text_data=json.dumps({"error": str(e)}))
+        
+    async def send_to_grpc_separate(self, audio_bytes: bytes):
+        """
+        Connect to gRPC when it's running as a separate Deployment/service in K8s.
+        Uses the service DNS name instead of localhost.
+        """
+        user_id = str(self.user_id) if self.user_id else "anonymous"
+        grpc_target = "voice-ai-grpc:50051"  # Kubernetes service name of the gRPC deployment
+        await self.log(f"[gRPC] Connecting to separate gRPC service at {grpc_target}")
+
+        async with grpc.aio.insecure_channel(grpc_target) as channel:
+            stub = service_pb2_grpc.AudioServiceStub(channel)
+            await self.log("[gRPC] Created stub for separate deployment")
+
+            async def gen_chunks():
+                chunk_size = 16000
+                for i in range(0, len(audio_bytes), chunk_size * 2):
+                    chunk = audio_bytes[i:i + chunk_size * 2]
+                    if not chunk:
+                        break
+                    yield audio_pb2.AudioChunk(pcm=chunk)
+                    await asyncio.sleep(0)  # yield control to event loop
+
+            try:
+                response = await asyncio.wait_for(
+                    stub.StreamTranscribe(gen_chunks(), metadata=(("user_id", user_id),)),
+                    timeout=30.0,
+                )
+                await self.log("[gRPC] Method invoked successfully on separate deployment")
+                return {"transcript": response.transcript}
+
+            except asyncio.CancelledError:
+                await self.log("[gRPC] Call cancelled due to disconnect")
+                return {"error": "gRPC call cancelled"}
+
+            except asyncio.TimeoutError:
+                await self.log("[gRPC] Call timed out")
+                return {"error": "gRPC call timed out"}
+
+            except grpc.aio.AioRpcError as e:
+                await self.log(f"[gRPC ERROR] {e.code()}: {e.details()}")
+                return {"error": f"gRPC call failed: {e.details()}"}
         
     async def send_to_grpc(self, audio_bytes: bytes):
         """
@@ -194,6 +244,7 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
             except grpc.aio.AioRpcError as e:
                 await self.log(f"[gRPC ERROR] {e.code()}: {e.details()}")
                 return {"error": f"gRPC call failed: {e.details()}"}
+            
 
 
     async def listen_llm_responses(self):

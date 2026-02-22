@@ -2,15 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    libsndfile1 \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libsndfile1 \
+ && apt-get install -y curl netcat-openbsd \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY e2e/ e2e/
+COPY . .
 
-WORKDIR /app/e2e
+RUN chmod +x wait.sh
 
-CMD ["pytest", "-v", "e2e_flow_test.py"]
+CMD ["./wait.sh"]

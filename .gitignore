@@ -3,3 +3,4 @@ venv/
 .env
 email_consumer.py
 .env.docker
+models

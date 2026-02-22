@@ -2,3 +2,10 @@
 frontend
 venv
 .vscode
+__pycache__
+*.pyc
+voice-ai-chart
+kind
+e2e
+.pytest_cache
+.github

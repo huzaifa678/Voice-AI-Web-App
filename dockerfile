@@ -34,10 +34,16 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*
 RUN pip install --no-cache-dir "uvicorn[standard]"
 
-
 COPY . .
 
+COPY models /app/models
+
+COPY .env.docker /app/.env.docker
+RUN chmod 600 /app/.env.docker
+
 RUN chmod +x voiceAI/start.sh \
-    && chmod +x voiceAI/wait-for-it.sh
+    && chmod +x voiceAI/k8s-start.sh \
+    && chmod +x voiceAI/wait-for-it.sh \
+    && chmod +x voiceAI/grpc-start.sh
 
 EXPOSE 8000

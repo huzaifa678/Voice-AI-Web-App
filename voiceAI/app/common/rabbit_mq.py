@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import pika
@@ -20,6 +21,13 @@ def get_channel():
     _channel = _connection.channel()
     return _channel, _connection
 
+async def get_persistent_channel():
+    global _channel
+    if _channel is None or _channel.is_closed:
+        conn = await get_connection()
+        _channel = await conn.channel()
+    return _channel
+
 async def get_connection():
     global _rmq_connection
 
@@ -34,8 +42,8 @@ async def get_connection():
 
 
 async def publish_audio_task(user_id: str, audio_bytes: bytes):
-    connection = await get_connection()
-    channel = await connection.channel()
+    
+    channel = await get_persistent_channel()
 
     await channel.declare_queue("audio_tasks", durable=True)
 
@@ -52,7 +60,7 @@ async def publish_audio_task(user_id: str, audio_bytes: bytes):
         routing_key="audio_tasks",
     )
 
-    await channel.close()
+    # await channel.close()
     
 async def publish_audio_response(user_id: str, response: str):
     """

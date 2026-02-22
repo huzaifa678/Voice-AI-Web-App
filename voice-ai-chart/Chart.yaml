@@ -4,7 +4,6 @@ description: Voice AI app with official Redis, RabbitMQ, Postgres charts
 type: application
 version: 0.1.0
 appVersion: "latest"
-
 dependencies:
   - name: redis
     version: "17.9.3" 
