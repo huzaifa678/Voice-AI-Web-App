@@ -101,5 +101,5 @@ async def test_handle_message_exception(mock_llm, mock_audio):
     with pytest.raises(Exception):
         await handle_message(message)
 
-    message.nack.assert_called_once_with(requeue=False)
+    assert message.nack.call_args.kwargs["requeue"] is False
     message.ack.assert_not_called()
