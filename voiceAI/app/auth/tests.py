@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from unittest.mock import patch, MagicMock
 
+
 @pytest.fixture
 def api_client():
     return APIClient()
@@ -20,23 +21,25 @@ class TestAuthViews:
         mock_user.email = "test@example.com"
         mock_register.return_value = mock_user
 
-        url = reverse("register")  
+        url = reverse("register")
         data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "strongpassword123"
+            "password": "strongpassword123",
         }
 
         response = api_client.post(url, data, format="json")
 
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["detail"] == "User created successfully"
-        mock_publish_email.assert_called_once_with({
-            "to_email": mock_user.email,
-            "subject": "Welcome to VoiceAI!",
-            "template": "welcome_email",
-            "context": {"username": mock_user.username}
-        })
+        mock_publish_email.assert_called_once_with(
+            {
+                "to_email": mock_user.email,
+                "subject": "Welcome to VoiceAI!",
+                "template": "welcome_email",
+                "context": {"username": mock_user.username},
+            }
+        )
 
     @patch("app.auth.views.AuthService.register")
     def test_register_failure_invalid_data(self, mock_register, api_client):
@@ -59,7 +62,7 @@ class TestAuthViews:
         assert response.status_code == status.HTTP_200_OK
         assert response.data == {
             "access": "access_token_mock",
-            "refresh": "refresh_token_mock"
+            "refresh": "refresh_token_mock",
         }
 
     @patch("app.auth.views.AuthService.login")

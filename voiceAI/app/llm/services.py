@@ -1,14 +1,12 @@
 import os
 from dotenv import load_dotenv
 import httpx
-import os
-import httpx
-
-
 import logging
+
 logger = logging.getLogger(__name__)
 
 load_dotenv()
+
 
 class LLMService:
     API_KEY = os.getenv("GROQ_API_KEY", "")
@@ -22,7 +20,7 @@ class LLMService:
 
         if not LLMService.API_KEY:
             raise RuntimeError("GROQ_API_KEY is not set")
-        
+
         print("TEXT", text)
 
         headers = {
@@ -32,11 +30,9 @@ class LLMService:
 
         payload = {
             "model": "llama-3.3-70b-versatile",
-            "messages": [
-                {"role": "user", "content": text}
-            ],
+            "messages": [{"role": "user", "content": text}],
             "max_tokens": max_tokens,
-            "temperature": 0.2
+            "temperature": 0.2,
         }
 
         async with httpx.AsyncClient(timeout=100.0) as client:

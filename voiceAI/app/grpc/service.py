@@ -15,6 +15,7 @@ executor = ThreadPoolExecutor(max_workers=4)
 User = get_user_model()
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
+
 class AudioServicer(service_pb2_grpc.AudioServiceServicer):
     """
     gRPC servicer for streaming audio transcription.
@@ -25,7 +26,7 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
         audio_chunks = []
         async for chunk in request_iterator:
             audio_chunks.append(chunk.pcm)
-            
+
         print("chunks appended")
 
         if not audio_chunks:
@@ -42,7 +43,7 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
         await asyncio.get_running_loop().run_in_executor(
             None, rate_limit, f"audio-transcribe:{user_id}", 30, 60
         )
-        
+
         print("after the running loop")
 
         audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
@@ -55,13 +56,11 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
         user = None
         if user_id:
             user = await loop.run_in_executor(
-                None,
-                lambda: User.objects.filter(id=user_id).first()
+                None, lambda: User.objects.filter(id=user_id).first()
             )
 
         session = await loop.run_in_executor(
-            None,
-            lambda: AudioSession.objects.create(user=user)
+            None, lambda: AudioSession.objects.create(user=user)
         )
 
         try:
@@ -83,23 +82,17 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
 
             await loop.run_in_executor(
                 None,
-                lambda: AudioSession.objects.filter(id=session.id)
-                .update(status=AudioSession.Status.PROCESSING)
+                lambda: AudioSession.objects.filter(id=session.id).update(
+                    status=AudioSession.Status.PROCESSING
+                ),
             )
 
             print("STARTING TRANSCRIPTION")
-            
-            transcript = await AudioService.transcribe_pcm(
-                audio_bytes,
-                16000
-            )
+
+            transcript = await AudioService.transcribe_pcm(audio_bytes, 16000)
             print("STARTING TRANSCRIPTION")
 
-            await loop.run_in_executor(
-                None,
-                session.mark_completed,
-                transcript or ""
-            )
+            await loop.run_in_executor(None, session.mark_completed, transcript or "")
 
             print("ABOUT TO PUBLISH AUDIO TASK")
             await publish_audio_task(
@@ -108,14 +101,8 @@ class AudioServicer(service_pb2_grpc.AudioServiceServicer):
             )
             print("PUBLISHED AUDIO TASK")
 
-            return audio_pb2.TranscriptionResponse(
-                transcript=transcript or ""
-            )
+            return audio_pb2.TranscriptionResponse(transcript=transcript or "")
 
         except Exception as e:
-            await loop.run_in_executor(
-                None,
-                session.mark_failed,
-                str(e)
-            )
+            await loop.run_in_executor(None, session.mark_failed, str(e))
             raise

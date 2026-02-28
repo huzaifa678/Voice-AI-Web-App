@@ -4,20 +4,18 @@ import asyncio
 from dotenv import load_dotenv
 import aio_pika
 import django
-
 from app.common.rabbit_mq import get_connection
+from django.conf import settings
+from django.core.mail import send_mail
 
 load_dotenv()
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
 django.setup()
 
-from django.conf import settings
-from django.core.mail import send_mail
-
 
 async def handle_email_message(message: aio_pika.IncomingMessage):
-    async with message.process(): 
+    async with message.process():
         data = json.loads(message.body)
 
         to_email = data.get("to_email")
@@ -62,7 +60,8 @@ async def main():
 
     print(" [*] Waiting for email tasks")
     print(" Press CTRL + C to exit")
-    await asyncio.Future()  
-    
+    await asyncio.Future()
+
+
 if __name__ == "__main__":
     asyncio.run(main())

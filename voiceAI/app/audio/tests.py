@@ -4,13 +4,14 @@ import numpy as np
 from unittest.mock import AsyncMock, patch, MagicMock
 from app.audio.consumers import AudioStreamConsumer
 
+
 @pytest.mark.asyncio
 async def test_connect_success(monkeypatch):
     consumer = AudioStreamConsumer()
 
     consumer.scope = {
         "client": ("127.0.0.1", 12345),
-        "user": type("User", (), {"id": 1})()
+        "user": type("User", (), {"id": 1})(),
     }
 
     consumer.accept = AsyncMock()
@@ -23,15 +24,15 @@ async def test_connect_success(monkeypatch):
     consumer.accept.assert_called_once()
     assert consumer.user_id == 1
     assert consumer.in_speech is False
-    
-    
+
+
 @pytest.mark.asyncio
 async def test_connect_unauthorized():
     consumer = AudioStreamConsumer()
 
     consumer.scope = {
         "client": ("127.0.0.1", 12345),
-        "user": type("User", (), {"id": None})()
+        "user": type("User", (), {"id": None})(),
     }
 
     consumer.accept = AsyncMock()
@@ -41,11 +42,12 @@ async def test_connect_unauthorized():
 
     consumer.close.assert_called_once_with(code=4401)
 
+
 @pytest.mark.asyncio
 async def test_process_buffer_short_audio():
     consumer = AudioStreamConsumer()
     consumer.user_id = 1
-    consumer.audio_buffer = b"\x00" * 1000  
+    consumer.audio_buffer = b"\x00" * 1000
     consumer.log = AsyncMock()
     consumer.send = AsyncMock()
 
@@ -53,11 +55,12 @@ async def test_process_buffer_short_audio():
 
     consumer.send.assert_not_called()
 
+
 @pytest.mark.asyncio
 async def test_process_buffer_success():
     consumer = AudioStreamConsumer()
     consumer.user_id = 1
-    consumer.audio_buffer = b"\x00" * 20000  
+    consumer.audio_buffer = b"\x00" * 20000
     consumer.log = AsyncMock()
     consumer.send = AsyncMock()
 
@@ -66,6 +69,7 @@ async def test_process_buffer_success():
     await consumer.process_buffer()
 
     consumer.send.assert_called_once()
+
 
 @pytest.mark.asyncio
 async def test_send_to_grpc_timeout(monkeypatch):
@@ -84,8 +88,8 @@ async def test_send_to_grpc_timeout(monkeypatch):
         result = await consumer.send_to_grpc(b"\x00" * 20000)
 
     assert result["error"] == "gRPC call timed out"
-    
-    
+
+
 @pytest.mark.asyncio
 async def test_disconnect_cleanup():
     consumer = AudioStreamConsumer()

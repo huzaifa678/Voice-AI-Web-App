@@ -5,9 +5,9 @@ from app.grpc.service import AudioServicer
 from app.grpc import audio_pb2
 from asgiref.sync import sync_to_async
 
-
-SAMPLE_AUDIO_BYTES = (b"\x01\x02" * 100)  # small dummy audio
+SAMPLE_AUDIO_BYTES = b"\x01\x02" * 100  # small dummy audio
 SAMPLE_USER_ID = 1
+
 
 class DummyContext:
     def __init__(self):
@@ -24,11 +24,11 @@ class DummyContext:
     def set_details(self, details):
         self.details = details
 
+
 class DummyRequest:
     def __init__(self, pcm):
         self.pcm = pcm
 
-import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
@@ -36,16 +36,22 @@ async def test_stream_transcribe_success():
     from app.models import User
 
     test_user, _ = await sync_to_async(User.objects.get_or_create)(
-        id=1,
-        defaults={"username": "test-user", "email": "test@example.com"}
+        id=1, defaults={"username": "test-user", "email": "test@example.com"}
     )
 
     servicer = AudioServicer()
 
-    with patch("app.grpc.service.VADService.is_speech", return_value=True) as mock_vad, \
-         patch("app.grpc.service.AudioService.transcribe_pcm", new_callable=AsyncMock, return_value="hello world") as mock_transcribe, \
-         patch("app.grpc.service.publish_audio_task", new_callable=AsyncMock) as mock_publish, \
-         patch("app.grpc.service.rate_limit", return_value=None):
+    with patch(
+        "app.grpc.service.VADService.is_speech", return_value=True
+    ) as mock_vad, patch(
+        "app.grpc.service.AudioService.transcribe_pcm",
+        new_callable=AsyncMock,
+        return_value="hello world",
+    ) as mock_transcribe, patch(
+        "app.grpc.service.publish_audio_task", new_callable=AsyncMock
+    ) as mock_publish, patch(
+        "app.grpc.service.rate_limit", return_value=None
+    ):
 
         async def request_gen():
             yield DummyRequest(SAMPLE_AUDIO_BYTES)
@@ -61,13 +67,15 @@ async def test_stream_transcribe_success():
         assert context.code is None
         assert context.details is None
 
+
 @pytest.mark.asyncio
 async def test_stream_transcribe_no_audio():
     servicer = AudioServicer()
 
     async def empty_request_gen():
         if False:
-            yield  
+            yield
+
     context = DummyContext()
     response = await servicer.StreamTranscribe(empty_request_gen(), context)
 

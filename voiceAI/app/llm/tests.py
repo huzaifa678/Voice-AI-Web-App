@@ -3,6 +3,7 @@ import httpx
 from unittest.mock import AsyncMock, patch
 from app.llm.services import LLMService
 
+
 @pytest.mark.asyncio
 async def test_query_from_text_no_api_key(monkeypatch):
     monkeypatch.setattr(LLMService, "API_KEY", None)
@@ -19,12 +20,8 @@ async def test_query_from_text_success(monkeypatch):
 
     response = httpx.Response(
         200,
-        request=request, 
-        json={
-            "choices": [
-                {"message": {"content": "Hello back!"}}
-            ]
-        }
+        request=request,
+        json={"choices": [{"message": {"content": "Hello back!"}}]},
     )
 
     with patch("httpx.AsyncClient") as mock_client:
@@ -34,7 +31,6 @@ async def test_query_from_text_success(monkeypatch):
         result = await LLMService.query_from_text_async("Hello")
 
     assert result == "Hello back!"
-
 
 
 @pytest.mark.asyncio
@@ -53,7 +49,6 @@ async def test_query_from_text_http_error(monkeypatch):
     assert result == "HTTP Error 500"
 
 
-
 @pytest.mark.asyncio
 async def test_query_from_text_request_error(monkeypatch):
     monkeypatch.setattr(LLMService, "API_KEY", "fake-key")
@@ -64,8 +59,8 @@ async def test_query_from_text_request_error(monkeypatch):
         result = await LLMService.query_from_text_async("Hello")
 
     assert result is None
-    
-    
+
+
 @pytest.mark.asyncio
 async def test_query_from_text_unexpected_error(monkeypatch):
     monkeypatch.setattr(LLMService, "API_KEY", "fake-key")
@@ -76,4 +71,3 @@ async def test_query_from_text_unexpected_error(monkeypatch):
         result = await LLMService.query_from_text_async("Hello")
 
     assert result is None
-

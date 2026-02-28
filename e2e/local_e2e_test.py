@@ -15,6 +15,7 @@ HTTP_BASE = os.getenv("HTTP_BASE", "http://localhost:8000/api")
 HTTP_BASE_HEALTH = os.getenv("HTTP_BASE_HEALTH", "http://localhost:8000")
 WS_URL = os.getenv("WS_URL", "ws://localhost:8000/ws/audio/")
 
+
 async def wait_for_server():
     async with httpx.AsyncClient() as client:
         for _ in range(40):
@@ -26,6 +27,7 @@ async def wait_for_server():
                 pass
             await asyncio.sleep(0.5)
     raise RuntimeError("Backend never became ready")
+
 
 @pytest.mark.asyncio
 async def test_audio_flow_e2e_smoke():
@@ -57,11 +59,10 @@ async def test_audio_flow_e2e_smoke():
         print(resp_json)
         access_token = resp.json()["access"]["access"]
         print(type(access_token))
-        
-        
+
     base_ws = os.getenv("WS_URL", "ws://localhost:8000/ws/audio/")
     WS_URL = f"{base_ws}?token={quote(access_token)}"
-    
+
     async with connect(
         WS_URL,
         max_size=10 * 1024 * 1024,
@@ -72,19 +73,18 @@ async def test_audio_flow_e2e_smoke():
 
         frame_bytes = 512 * 2
         for i in range(0, len(pcm16), frame_bytes):
-            await websocket.send(pcm16[i:i + frame_bytes])
+            await websocket.send(pcm16[i : i + frame_bytes])
             await asyncio.sleep(0.01)
-            
+
         silence_duration_sec = 2.5
         silence = np.zeros(
-            int(TARGET_SR * silence_duration_sec),
-            dtype=np.int16
+            int(TARGET_SR * silence_duration_sec), dtype=np.int16
         ).tobytes()
 
         for i in range(0, len(silence), frame_bytes):
-            await websocket.send(silence[i:i + frame_bytes])
+            await websocket.send(silence[i : i + frame_bytes])
             await asyncio.sleep(0.01)
-            
+
         await asyncio.sleep(1.5)
         await websocket.send(b"")
 
@@ -112,4 +112,4 @@ async def test_audio_flow_e2e_smoke():
                 break
 
         assert transcript_received, "gRPC transcription never returned"
-        assert llm_received, "LLM response never returned" 
+        assert llm_received, "LLM response never returned"

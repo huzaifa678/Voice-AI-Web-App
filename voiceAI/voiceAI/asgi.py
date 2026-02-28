@@ -8,23 +8,22 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
 """
 
 import os
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'voiceAI.settings')
-import django
-django.setup()
-
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
-from django.core.asgi import get_asgi_application
 import grpc
 from app.audio.routing import websocket_urlpatterns
-from app.grpc import audio_pb2_grpc
 from app.grpc.service import AudioServicer
 from app.grpc import service_pb2_grpc
 
 from app.middleware.jwt_middleware import JWTAuthMiddleware
+import django
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
+
+django.setup()
 
 django_asgi_app = get_asgi_application()
+
 
 class LifespanApp:
     def __init__(self, app):
@@ -55,13 +54,12 @@ class LifespanApp:
         self.grpc_server = grpc.aio.server()
 
         service_pb2_grpc.add_AudioServiceServicer_to_server(
-            AudioServicer(),
-            self.grpc_server
+            AudioServicer(), self.grpc_server
         )
 
         self.grpc_server.add_insecure_port("[::]:50051")
 
-        await self.grpc_server.start()  
+        await self.grpc_server.start()
         print("gRPC server started on port 50051")
 
     async def shutdown(self):
@@ -75,10 +73,10 @@ class LifespanApp:
 
 
 application = LifespanApp(
-    ProtocolTypeRouter({
-        "http": django_asgi_app,
-        "websocket": JWTAuthMiddleware(
-            URLRouter(websocket_urlpatterns)
-        ),
-    })
+    ProtocolTypeRouter(
+        {
+            "http": django_asgi_app,
+            "websocket": JWTAuthMiddleware(URLRouter(websocket_urlpatterns)),
+        }
+    )
 )

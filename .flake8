@@ -1,0 +1,13 @@
+[flake8]
+max-line-length = 120
+extend-ignore = E203, W503
+exclude =
+    .git,
+    __pycache__,
+    node_modules,
+    */migrations/*,
+    voiceAI/app/grpc/*_pb2.py,
+    voiceAI/app/grpc/*_pb2_grpc.py,
+    voiceAI/app/workers/email_consumer.py,
+    env,
+    venv

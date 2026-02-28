@@ -11,7 +11,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from app.common.jwt import generate_token
 from app.common.rate_limit import rate_limit
 from app.common.utils import parse_timedelta
-from app.models import RefreshToken  
+from app.models import RefreshToken
 
 load_dotenv()
 
@@ -19,21 +19,24 @@ User = get_user_model()
 
 REFRESH_TOKEN_LIFETIME = parse_timedelta(os.getenv("REFRESH_TOKEN_LIFETIME", "7d"))
 
+
 class AuthService:
-    
+
     @staticmethod
     def register(username: str, email: str, password: str):
         if User.objects.filter(username=username).exists():
             raise ValueError("Username already exists")
 
-        user = User.objects.create_user(username=username, email=email, password=password)
+        user = User.objects.create_user(
+            username=username, email=email, password=password
+        )
         return user
-    
+
     @staticmethod
     def login(ip: str, username: str, password: str):
-        
+
         print("lifetime", REFRESH_TOKEN_LIFETIME)
-        
+
         rate_limit(
             key=f"login:{ip}",
             limit=5,
@@ -43,11 +46,11 @@ class AuthService:
         user = authenticate(username=username, password=password)
         if not user:
             raise ValueError("Invalid credentials")
-        
+
         aceessToken = generate_token(user)
-        
+
         refreshToken = secrets.token_urlsafe(64)
-        
+
         RefreshToken.objects.create(
             user=user,
             token=refreshToken,
@@ -55,7 +58,7 @@ class AuthService:
         )
 
         return aceessToken, refreshToken
-    
+
     @staticmethod
     def refresh(refresh_token_str: str):
         """
@@ -74,7 +77,7 @@ class AuthService:
         return {
             "access": access_token,
         }
-        
+
     @staticmethod
     def verify_token(token: str):
         """
@@ -93,8 +96,8 @@ class AuthService:
             return User.objects.get(id=user_id)
         except User.DoesNotExist:
             raise ValueError("User not found")
-        
-    
+
+
 class JWTAuthenticationService(BaseAuthentication):
     def authenticate(self, request):
         auth = request.headers.get("Authorization")

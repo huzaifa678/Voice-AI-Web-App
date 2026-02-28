@@ -1,6 +1,7 @@
 import time
 from .redis import redis_client
 
+
 class RateLimitExceeded(Exception):
     pass
 

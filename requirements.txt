@@ -29,3 +29,6 @@ grpcio-tools
 pytest
 pytest-django
 pytest-asyncio
+flake8
+black
+autoflake

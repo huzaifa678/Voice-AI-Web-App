@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import json
 import pika
@@ -9,6 +8,7 @@ _rmq_connection = None
 
 _connection = None
 _channel = None
+
 
 def get_channel():
     global _connection, _channel
@@ -21,6 +21,7 @@ def get_channel():
     _channel = _connection.channel()
     return _channel, _connection
 
+
 async def get_persistent_channel():
     global _channel
     if _channel is None or _channel.is_closed:
@@ -28,21 +29,19 @@ async def get_persistent_channel():
         _channel = await conn.channel()
     return _channel
 
+
 async def get_connection():
     global _rmq_connection
 
     if _rmq_connection and not _rmq_connection.is_closed:
         return _rmq_connection
 
-    _rmq_connection = await aio_pika.connect_robust(
-        os.getenv("RABBITMQ_URL")
-    )
+    _rmq_connection = await aio_pika.connect_robust(os.getenv("RABBITMQ_URL"))
     return _rmq_connection
 
 
-
 async def publish_audio_task(user_id: str, audio_bytes: bytes):
-    
+
     channel = await get_persistent_channel()
 
     await channel.declare_queue("audio_tasks", durable=True)
@@ -61,7 +60,8 @@ async def publish_audio_task(user_id: str, audio_bytes: bytes):
     )
 
     # await channel.close()
-    
+
+
 async def publish_audio_response(user_id: str, response: str):
     """
     Publishes a processed LLM/audio response to RabbitMQ.
@@ -71,24 +71,20 @@ async def publish_audio_response(user_id: str, response: str):
     channel = await connection.channel()
 
     exchange = await channel.declare_exchange(
-        "audio_responses_exchange",
-        aio_pika.ExchangeType.DIRECT,
-        durable=True
+        "audio_responses_exchange", aio_pika.ExchangeType.DIRECT, durable=True
     )
 
-    payload = {
-        "user_id": user_id,
-        "response": response
-    }
+    payload = {"user_id": user_id, "response": response}
 
     await exchange.publish(
         aio_pika.Message(
             body=json.dumps(payload).encode(),
         ),
-        routing_key="audio_responses"
+        routing_key="audio_responses",
     )
 
     await channel.close()
+
 
 async def publish_email_task(email_data: dict):
     connection = await get_connection()

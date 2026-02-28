@@ -11,30 +11,36 @@ from .services import AuthService
 
 User = get_user_model()
 
+
 class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             try:
                 user = AuthService.register(
-                    username=serializer.validated_data['username'],
-                    email=serializer.validated_data['email'],
-                    password=serializer.validated_data['password'],
-                )   
-                
-                publish_email_task({
-                    "to_email": user.email,
-                    "subject": "Welcome to VoiceAI!",
-                    "template": "welcome_email", 
-                    "context": {
-                    "username": user.username
-                }})
-                
-                return Response({"detail": "User created successfully"}, status=status.HTTP_201_CREATED)
+                    username=serializer.validated_data["username"],
+                    email=serializer.validated_data["email"],
+                    password=serializer.validated_data["password"],
+                )
+
+                publish_email_task(
+                    {
+                        "to_email": user.email,
+                        "subject": "Welcome to VoiceAI!",
+                        "template": "welcome_email",
+                        "context": {"username": user.username},
+                    }
+                )
+
+                return Response(
+                    {"detail": "User created successfully"},
+                    status=status.HTTP_201_CREATED,
+                )
             except ValueError as e:
                 return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         print(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class LoginView(APIView):
     def post(self, request):
@@ -44,27 +50,25 @@ class LoginView(APIView):
             try:
                 accessToken, refreshToken = AuthService.login(
                     ip=ip,
-                    username=serializer.validated_data['username'],
-                    password=serializer.validated_data['password'],
+                    username=serializer.validated_data["username"],
+                    password=serializer.validated_data["password"],
                 )
-                
-                tokens = {
-                    "access": accessToken,
-                    "refresh": refreshToken
-                }
-                
+
+                tokens = {"access": accessToken, "refresh": refreshToken}
+
                 return Response(tokens, status=status.HTTP_200_OK)
             except ValueError as e:
                 return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+
 class RefreshView(APIView):
     def post(self, request):
         serializer = RefreshSerializer(data=request.data)
         if serializer.is_valid():
             try:
-                print("serialized data", serializer.validated_data['refresh'])
-                token = AuthService.refresh(serializer.validated_data['refresh'])
+                print("serialized data", serializer.validated_data["refresh"])
+                token = AuthService.refresh(serializer.validated_data["refresh"])
                 return Response(token, status=status.HTTP_200_OK)
             except ValueError as e:
                 print(e)

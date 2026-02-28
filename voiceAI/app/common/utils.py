@@ -1,6 +1,7 @@
 from datetime import timedelta
 import re
 
+
 def parse_timedelta(duration_str: str) -> timedelta:
     """
     Convert strings like '24h', '7d', '30m', '15s' to timedelta

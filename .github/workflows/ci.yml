@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-
       postgres:
         image: postgres:15
         env:
@@ -47,6 +46,14 @@ jobs:
         with:
           python-version: 3.11
 
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -55,6 +62,11 @@ jobs:
       - name: Run migrations
         run: |
           python manage.py migrate
+        working-directory: voiceAI
+
+      - name: Lint code
+        run: |
+          flake8 . --exclude=voiceAI/app/grpc/*.pb2.py,venv,__pycache__ --max-line-length=88
         working-directory: voiceAI
 
       - name: Run tests
