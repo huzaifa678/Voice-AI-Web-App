@@ -67,7 +67,6 @@ jobs:
       - name: Lint code
         run: |
           flake8 . --exclude=voiceAI/app/grpc/*.pb2.py,venv,__pycache__ --max-line-length=88
-        working-directory: voice-AI
 
       - name: Run tests
         run: |
