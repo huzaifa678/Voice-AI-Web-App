@@ -96,8 +96,8 @@ async def test_audio_flow_e2e_smoke():
 
         transcript_received = False
         llm_received = False
-        tts_received = False         
-        tts_audio_bytes = b"" 
+        tts_received = False
+        tts_audio_bytes = b""
         deadline = asyncio.get_event_loop().time() + 180
 
         while asyncio.get_event_loop().time() < deadline:
@@ -115,7 +115,7 @@ async def test_audio_flow_e2e_smoke():
             if "llmResponse" in payload:
                 llm_received = True
                 print("LLM:", payload["llmResponse"])
-                
+
             if "audioBase64" in payload and payload["audioBase64"] is not None:
                 tts_received = True
                 tts_audio_bytes = base64.b64decode(payload["audioBase64"])

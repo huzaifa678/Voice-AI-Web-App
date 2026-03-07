@@ -62,7 +62,9 @@ async def publish_audio_task(user_id: str, audio_bytes: bytes):
     # await channel.close()
 
 
-async def publish_audio_response(user_id: str, response: str = None, audio_bytes: str = None):
+async def publish_audio_response(
+    user_id: str, response: str = None, audio_bytes: str = None
+):
     """
     Publishes a processed LLM/audio response to RabbitMQ.
     - user_id: target user

@@ -27,7 +27,7 @@ class FakeAudioMessage:
         self.body = body
         self.ack = AsyncMock()
         self.nack = AsyncMock()
-        
+
 
 class FakeTTSMessage:
     def __init__(self, body):
@@ -111,7 +111,8 @@ async def test_handle_message_exception(mock_llm, mock_audio):
 
     assert message.nack.call_args.kwargs["requeue"] is False
     message.ack.assert_not_called()
-    
+
+
 @pytest.mark.asyncio
 @patch("app.workers.task_tts.TTSService.synthesize", new_callable=Mock)
 @patch("app.workers.task_tts.publish_audio_response", new_callable=AsyncMock)
