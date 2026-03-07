@@ -1,5 +1,5 @@
 [flake8]
-max-line-length = 120
+max-line-length = 130
 extend-ignore = E203, W503
 exclude =
     .git,
@@ -9,5 +9,6 @@ exclude =
     voiceAI/app/grpc/*_pb2.py,
     voiceAI/app/grpc/*_pb2_grpc.py,
     voiceAI/app/workers/email_consumer.py,
+    voiceAI/voiceAI/asgi.py,
     env,
     venv

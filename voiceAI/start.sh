@@ -11,6 +11,9 @@ python -m app.workers.task_email &
 echo "Starting RabbitMQ audio worker..."
 python -m app.workers.task_audio &
 
+echo "Starting RabbitMQ tts worker..."
+python -m app.workers.task_tts &
+
 echo "Starting Django server..."
 exec uvicorn voiceAI.asgi:application \
   --host 0.0.0.0 \

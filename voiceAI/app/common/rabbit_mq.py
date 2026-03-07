@@ -62,10 +62,14 @@ async def publish_audio_task(user_id: str, audio_bytes: bytes):
     # await channel.close()
 
 
-async def publish_audio_response(user_id: str, response: str):
+async def publish_audio_response(
+    user_id: str, response: str = None, audio_bytes: str = None
+):
     """
     Publishes a processed LLM/audio response to RabbitMQ.
-    Ensures the queue and exchange exist, and publishes a persistent message.
+    - user_id: target user
+    - response: text from LLM
+    - audio_bytes: base64-encoded audio for TTS
     """
     connection = await get_connection()
     channel = await connection.channel()
@@ -74,11 +78,16 @@ async def publish_audio_response(user_id: str, response: str):
         "audio_responses_exchange", aio_pika.ExchangeType.DIRECT, durable=True
     )
 
-    payload = {"user_id": user_id, "response": response}
+    payload = {"user_id": user_id}
+    if response is not None:
+        payload["response"] = response
+    if audio_bytes is not None:
+        payload["audio_bytes"] = audio_bytes
 
     await exchange.publish(
         aio_pika.Message(
             body=json.dumps(payload).encode(),
+            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
         ),
         routing_key="audio_responses",
     )

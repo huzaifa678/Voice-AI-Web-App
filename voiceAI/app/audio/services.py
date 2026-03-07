@@ -67,7 +67,7 @@ class AudioService:
             from faster_whisper import WhisperModel
 
             if ENVIRONMENT == "local":
-                cls._model = WhisperModel("Base", device="cpu", compute_type="int8")
+                cls._model = WhisperModel("base", device="cpu", compute_type="int8")
             else:
                 cls._model = WhisperModel(
                     cls.MODEL_PATH, device="cpu", compute_type="int8"

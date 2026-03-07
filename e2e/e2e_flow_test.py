@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import os
 from urllib.parse import quote
@@ -33,8 +34,8 @@ async def wait_for_server():
 async def test_audio_flow_e2e_smoke():
     await wait_for_server()
 
-    http_base = os.environ["HTTP_BASE"]
-    ws_base = os.environ["WS_URL"]
+    http_base = HTTP_BASE
+    ws_base = WS_URL
 
     print("HTTP_BASE =", http_base)
     print("WS_URL =", ws_base)
@@ -70,7 +71,7 @@ async def test_audio_flow_e2e_smoke():
 
     async with connect(
         ws_url,
-        max_size=10 * 1024 * 1024,
+        max_size=50 * 1024 * 1024,
     ) as websocket:
         pcm, sr = sf.read("fixtures/test.wav", dtype="int16")
         assert sr == TARGET_SR
@@ -95,7 +96,9 @@ async def test_audio_flow_e2e_smoke():
 
         transcript_received = False
         llm_received = False
-        deadline = asyncio.get_event_loop().time() + 120
+        tts_received = False
+        tts_audio_bytes = b""
+        deadline = asyncio.get_event_loop().time() + 180
 
         while asyncio.get_event_loop().time() < deadline:
             try:
@@ -113,8 +116,15 @@ async def test_audio_flow_e2e_smoke():
                 llm_received = True
                 print("LLM:", payload["llmResponse"])
 
-            if transcript_received and llm_received:
+            if "audioBase64" in payload and payload["audioBase64"] is not None:
+                tts_received = True
+                tts_audio_bytes = base64.b64decode(payload["audioBase64"])
+                print(f"TTS audio received: {len(tts_audio_bytes)} bytes")
+
+            if transcript_received and llm_received and tts_received:
                 break
 
         assert transcript_received, "gRPC transcription never returned"
         assert llm_received, "LLM response never returned"
+        assert tts_received, "TTS audio response never returned"
+        assert len(tts_audio_bytes) > 0, "TTS audio response was empty"

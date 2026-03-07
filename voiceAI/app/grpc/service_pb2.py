@@ -19,7 +19,6 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b"\n\rservice.proto\x12\x05\x61udio\x1a\x0b\x61udio.proto2I\n\x0c\x41udioService\x12\x39\n\x10StreamTranscribe\x12\x0b.AudioChunk\x1a\x16.TranscriptionResponse(\x01\x62\x06proto3"
 )
