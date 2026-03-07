@@ -6,9 +6,14 @@ import { setCredentials } from "@redux/authSlice";
 import { refreshAccessToken } from "@/api/auth/refresh.route";
 import { jwtDecode } from "jwt-decode";
 
+export type LLMResponse = {
+    llmResponse?: string;
+    audioBase64?: string;
+};
+
 export function useStreamingSTT(wsUrl: string, token?: string) {
   const [transcript, setTranscript] = useState<string>("");
-  const [llmResponse, setLlmResponse] = useState<string>("");
+  const [llmResponse, setLlmResponse] = useState<LLMResponse | null>(null);
 
   const recorder = useRecorder((pcmBuffer) => {
     ws.send(pcmBuffer);
@@ -17,8 +22,11 @@ export function useStreamingSTT(wsUrl: string, token?: string) {
   const ws = useWebSocket(wsUrl, recorder, (event) => {
     const data = JSON.parse(event.data);
     if (data.transcript) setTranscript(data.transcript);
-    if (data.llmResponse) {
-      setLlmResponse(data.llmResponse);
+    if (data.llmResponse || data.audioBase64) {
+      setLlmResponse({
+        llmResponse: data.llmResponse,
+        audioBase64: data.audioBase64,
+      });
     }
   });
 
@@ -35,7 +43,7 @@ export function useStreamingSTT(wsUrl: string, token?: string) {
 
   const start = async () => {
     setTranscript("");
-    setLlmResponse("");
+    setLlmResponse(null);
 
     let access = token ?? store.getState().auth.accessToken;
     const refresh = localStorage.getItem('refresh-token')

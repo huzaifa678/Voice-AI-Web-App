@@ -1,9 +1,10 @@
 import pytest
 import json
 import base64
-from unittest.mock import patch, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock
 from app.workers.task_email import handle_email_message
 from app.workers.task_audio import handle_message
+from app.workers.task_tts import handle_tts_message
 
 
 class FakeEmailMessage:
@@ -22,6 +23,13 @@ class FakeEmailMessage:
 
 
 class FakeAudioMessage:
+    def __init__(self, body):
+        self.body = body
+        self.ack = AsyncMock()
+        self.nack = AsyncMock()
+        
+
+class FakeTTSMessage:
     def __init__(self, body):
         self.body = body
         self.ack = AsyncMock()
@@ -102,4 +110,38 @@ async def test_handle_message_exception(mock_llm, mock_audio):
         await handle_message(message)
 
     assert message.nack.call_args.kwargs["requeue"] is False
+    message.ack.assert_not_called()
+    
+@pytest.mark.asyncio
+@patch("app.workers.task_tts.TTSService.synthesize", new_callable=Mock)
+@patch("app.workers.task_tts.publish_audio_response", new_callable=AsyncMock)
+async def test_handle_tts_message_success(mock_publish, mock_synthesize):
+    fake_audio_bytes = b"fake audio data"
+    mock_synthesize.return_value = fake_audio_bytes
+    payload = {"text": "Hello world", "user_id": "123"}
+    message = FakeTTSMessage(json.dumps(payload).encode())
+
+    await handle_tts_message(message)
+
+    mock_synthesize.assert_called_once_with("Hello world")
+    audio_b64 = base64.b64encode(fake_audio_bytes).decode("utf-8")
+    mock_publish.assert_awaited_once_with(user_id="123", audio_bytes=audio_b64)
+    message.ack.assert_awaited_once()
+    message.nack.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch("app.workers.task_tts.TTSService.synthesize", new_callable=Mock)
+@patch("app.workers.task_tts.publish_audio_response", new_callable=AsyncMock)
+async def test_handle_tts_message_synthesize_exception(mock_publish, mock_synthesize):
+    mock_synthesize.side_effect = Exception("Synthesis failed")
+    payload = {"text": "Hello world", "user_id": "123"}
+    message = FakeTTSMessage(json.dumps(payload).encode())
+
+    with pytest.raises(Exception):
+        await handle_tts_message(message)
+
+    mock_synthesize.assert_called_once_with("Hello world")
+    mock_publish.assert_not_called()
+    message.nack.assert_awaited_once_with(requeue=False)
     message.ack.assert_not_called()

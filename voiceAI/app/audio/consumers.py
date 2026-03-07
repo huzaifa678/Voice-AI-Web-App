@@ -273,7 +273,7 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
                     if str(data.get("user_id")) == str(self.user_id):
                         await self.log(f"sending the message {data}")
                         await self.send(
-                            text_data=json.dumps({"llmResponse": data.get("response")})
+                            text_data=json.dumps({"llmResponse": data.get("response"), "audioBase64": data.get("audio_bytes")})
                         )
 
     async def _log_worker(self):

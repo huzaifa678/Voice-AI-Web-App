@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import aio_pika
+from aio_pika import channel
 from app.audio.services import AudioService
 from app.llm.services import LLMService
 from app.common.rabbit_mq import get_connection, publish_audio_response
@@ -18,7 +19,15 @@ async def handle_message(message: aio_pika.IncomingMessage):
 
         text = await asyncio.to_thread(AudioService.process_audio, audio_bytes)
 
-        if not text.strip():
+        if text is None:
+            print("Speech-to-text returned None")
+            await message.ack()
+            return
+
+        text = text.strip()
+
+        if text == "":
+            print("Speech-to-text returned empty string")
             await message.ack()
             return
 
@@ -27,12 +36,29 @@ async def handle_message(message: aio_pika.IncomingMessage):
         print("LLM response: ", response)
 
         await publish_audio_response(user_id=payload.get("user_id"), response=response)
+        
+        connection = await get_connection()
+        channel = await connection.channel()
+        tts_message = aio_pika.Message(
+            body=json.dumps({
+                "text": response,
+                "user_id": payload.get("user_id")
+            }).encode(),
+            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+        )
+        await channel.default_exchange.publish(
+            tts_message,
+            routing_key="tts_tasks",
+        )        
+        print("TTS task published")
+        
+        await channel.close()
 
         await message.ack()
 
     except Exception as e:
-        await message.nack(requeue=False, reason=str(e))
-        raise
+        await message.nack(requeue=False)
+        raise e
 
 
 async def main():

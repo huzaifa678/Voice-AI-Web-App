@@ -10,6 +10,7 @@ export default function StreamingPage() {
 
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [audioObj, setAudioObj] = useState<HTMLAudioElement | null>(null);
   const router = useRouter();
   const dispatch = useAppDispatch();
 
@@ -17,13 +18,27 @@ export default function StreamingPage() {
     setAccessToken(localStorage.getItem("access-token"));
     setRefreshToken(localStorage.getItem("refresh-token"));
   }, []);
-
   console.log(accessToken)
   console.log(refreshToken)
-  const {start, stop, transcript, llmResponse,} = useStreamingSTT(
+
+  const { start, stop, transcript, llmResponse } = useStreamingSTT(
     "ws://localhost:8000/ws/audio/",
     accessToken || undefined
   );
+
+  useEffect(() => {
+    if (llmResponse?.audioBase64) {
+       console.log("LLM Audio Base64:", llmResponse?.audioBase64);
+      const audio = new Audio(`data:audio/wav;base64,${llmResponse.audioBase64}`);
+      setAudioObj(audio);
+    }
+  }, [llmResponse]);
+
+  const handlePlayAudio = () => {
+    if (audioObj) {
+      audioObj.play().catch(err => console.error("Audio play error:", err));
+    }
+  };
 
   const handleLogout = () => {
     dispatch(logout())
@@ -67,8 +82,17 @@ export default function StreamingPage() {
       {llmResponse && (
         <div className="w-full max-w-xl p-4 bg-green-100 rounded">
           <h3 className="font-semibold mb-1">LLM Response</h3>
-          <p>{llmResponse}</p>
+          <p>{llmResponse.llmResponse}</p>
         </div>
+      )}
+
+      {llmResponse?.audioBase64 && (
+        <button
+          onClick={handlePlayAudio}
+          className="bg-yellow-500 text-white px-3 py-1 rounded"
+        >
+          Play LLM Audio
+        </button>
       )}
     </div>
   );
