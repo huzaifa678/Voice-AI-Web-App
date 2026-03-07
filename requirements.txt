@@ -23,8 +23,8 @@ django-cors-headers==4.9.0
 uvicorn[standard]==0.34.0
 scipy==1.15.2
 aio_pika==9.5.5
-grpcio==1.70.0
-grpcio-tools==1.70.0
+grpcio
+grpcio-tools
 pytest==8.3.4
 pytest-django==4.10.0
 pytest-asyncio==0.25.3
