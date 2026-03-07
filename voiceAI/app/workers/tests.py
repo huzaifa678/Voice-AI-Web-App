@@ -65,10 +65,12 @@ async def test_handle_email_message_success(mock_send_mail):
     "app.workers.task_audio.LLMService.query_from_text_async", new_callable=AsyncMock
 )
 @patch("app.workers.task_audio.publish_audio_response", new_callable=AsyncMock)
-async def test_handle_message_success(mock_publish, mock_llm, mock_audio, mock_get_connection):
+async def test_handle_message_success(
+    mock_publish, mock_llm, mock_audio, mock_get_connection
+):
     mock_audio.return_value = "Hello world"  # sync string
     mock_llm.return_value = "LLM response text"
-    
+
     mock_channel = AsyncMock()
 
     mock_connection = AsyncMock()
@@ -92,7 +94,7 @@ async def test_handle_message_success(mock_publish, mock_llm, mock_audio, mock_g
 @patch("app.workers.task_audio.get_connection", new_callable=AsyncMock)
 async def test_handle_message_empty_audio(mock_audio, mock_get_connection):
     mock_audio.return_value = ""  # empty string
-    
+
     mock_channel = AsyncMock()
 
     mock_connection = AsyncMock()
