@@ -59,23 +59,22 @@ async def test_handle_email_message_success(mock_send_mail):
 
 
 @pytest.mark.asyncio
-@patch("app.workers.task_audio.AudioService.process_audio")  # sync function
-@patch("app.workers.task_audio.get_connection", new_callable=AsyncMock)
+@patch("app.workers.task_audio.publish_audio_response", new_callable=AsyncMock)
 @patch(
     "app.workers.task_audio.LLMService.query_from_text_async", new_callable=AsyncMock
 )
-@patch("app.workers.task_audio.publish_audio_response", new_callable=AsyncMock)
+@patch("app.workers.task_audio.get_connection")
+@patch("app.workers.task_audio.AudioService.process_audio")
 async def test_handle_message_success(
-    mock_publish, mock_llm, mock_audio, mock_get_connection
+    mock_process_audio, mock_get_connection, mock_query_llm, mock_publish
 ):
-    mock_audio.return_value = "Hello world"  # sync string
-    mock_llm.return_value = "LLM response text"
+    mock_process_audio.return_value = "Hello world"
+
+    mock_query_llm.return_value = "LLM response text"
 
     mock_channel = AsyncMock()
-
     mock_connection = AsyncMock()
-    mock_connection.channel.return_value = mock_channel
-
+    mock_connection.channel = AsyncMock(return_value=mock_channel)
     mock_get_connection.return_value = mock_connection
 
     payload = {"audio_bytes": base64.b64encode(b"fake audio").decode(), "user_id": 123}
@@ -83,17 +82,18 @@ async def test_handle_message_success(
 
     await handle_message(message)
 
-    mock_audio.assert_called_once()
-    mock_llm.assert_called_once_with(text="Hello world")
+    mock_process_audio.assert_called_once()
+    mock_query_llm.assert_called_once_with(text="Hello world")
     mock_publish.assert_called_once_with(user_id=123, response="LLM response text")
     message.ack.assert_called_once()
+    mock_connection.channel.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 @patch("app.workers.task_audio.AudioService.process_audio")
 @patch("app.workers.task_audio.get_connection", new_callable=AsyncMock)
-async def test_handle_message_empty_audio(mock_audio, mock_get_connection):
-    mock_audio.return_value = ""  # empty string
+async def test_handle_message_empty_audio(mock_get_connection, mock_process_audio):
+    mock_process_audio.return_value = ""  # empty string
 
     mock_channel = AsyncMock()
 
@@ -118,8 +118,10 @@ async def test_handle_message_empty_audio(mock_audio, mock_get_connection):
     "app.workers.task_audio.LLMService.query_from_text_async", new_callable=AsyncMock
 )
 @patch("app.workers.task_audio.get_connection", new_callable=AsyncMock)
-async def test_handle_message_exception(mock_llm, mock_audio, Mock_get_connection):
-    mock_audio.side_effect = Exception("Audio processing failed")
+async def test_handle_message_exception(
+    mock_get_connection, mock_query_llm, mock_process_audio
+):
+    mock_process_audio.side_effect = Exception("Audio processing failed")
 
     payload = {"audio_bytes": base64.b64encode(b"fake audio").decode()}
     message = FakeAudioMessage(json.dumps(payload).encode())

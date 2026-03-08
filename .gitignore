@@ -4,3 +4,8 @@ venv/
 email_consumer.py
 .env.docker
 models
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
