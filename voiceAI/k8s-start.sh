@@ -28,8 +28,8 @@ if [ -n "$KUBERNETES_SERVICE_HOST" ]; then
     ./wait-for-it.sh "$RABBITMQ_HOST:5672" --timeout=60 -- echo "RabbitMQ is ready"
 fi
 
-echo "Starting RabbitMQ email worker..."
-python -m app.workers.task_email &
+# echo "Starting RabbitMQ email worker..."
+# python -m app.workers.task_email &
 
 echo "Starting Django server..."
 exec uvicorn voiceAI.asgi:application \

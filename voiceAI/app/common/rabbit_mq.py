@@ -9,6 +9,7 @@ _rmq_connection = None
 _connection = None
 _channel = None
 
+RABBITMQ_URL = os.getenv("RABBITMQ_URL") or os.getenv("CELERY_BROKER_URL")
 
 def get_channel():
     global _connection, _channel
@@ -16,7 +17,7 @@ def get_channel():
     if _connection and _connection.is_open:
         return _channel, _connection
 
-    params = pika.URLParameters(os.getenv("RABBITMQ_URL", ""))
+    params = pika.URLParameters(RABBITMQ_URL)
     _connection = pika.BlockingConnection(params)
     _channel = _connection.channel()
     return _channel, _connection
@@ -41,25 +42,11 @@ async def get_connection():
 
 
 async def publish_audio_task(user_id: str, audio_bytes: bytes):
+    """Publish an audio task into the Celery queue."""
 
-    channel = await get_persistent_channel()
+    from app.workers.task_audio import process_audio_task
 
-    await channel.declare_queue("audio_tasks", durable=True)
-
-    payload = {
-        "user_id": user_id,
-        "audio_bytes": base64.b64encode(audio_bytes).decode(),
-    }
-
-    await channel.default_exchange.publish(
-        aio_pika.Message(
-            body=json.dumps(payload).encode(),
-            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-        ),
-        routing_key="audio_tasks",
-    )
-
-    # await channel.close()
+    process_audio_task.delay(user_id, base64.b64encode(audio_bytes).decode())
 
 
 async def publish_audio_response(
@@ -96,20 +83,11 @@ async def publish_audio_response(
 
 
 async def publish_email_task(email_data: dict):
-    connection = await get_connection()
-    channel = await connection.channel()
+    """Publish an email task into the Celery queue."""
 
-    await channel.declare_queue("email_tasks", durable=True)
+    from app.workers.task_email import send_welcome_email
 
-    await channel.default_exchange.publish(
-        aio_pika.Message(
-            body=json.dumps(email_data).encode(),
-            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-        ),
-        routing_key="email_tasks",
-    )
-
-    await channel.close()
+    send_welcome_email.delay(email_data)
 
 
 def close_connection():

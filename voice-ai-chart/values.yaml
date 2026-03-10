@@ -6,6 +6,20 @@ grpc:
 audioWorker:
   replicaCount: 1
 
+ttsWorker:
+  replicaCount: 1
+
+xtts:
+  enableInitContainer: true
+
+volumeMounts:
+  xttsModel:
+    name: xtts-model
+    mountPath: /app/models/xtts
+
+volumeClaim:
+  name: xtts-model-pvc
+
 image:
   repository: huzaifagill234/voice-ai-web
   tag: ci
@@ -32,7 +46,7 @@ env:
   RABBITMQ_HOST: voice-ai-rabbitmq
   RABBITMQ_USER: guest
   RABBITMQ_PASSWORD: guest
-  RABBITMQ_URL: amqp://guest:guest@voice-ai-rabbitmq:5672/
+  RABBITMQ_URL: amqp://guest:guest@voice-ai-rabbitmq:5672//
   GOOGLE_USER_EMAIL: voiceai3004@gmail.com
   ALLOWED_HOSTS: "voice-ai,voice-ai.default.svc.cluster.local,localhost,127.0.0.1"
   GRPC_DEPLOYMENT_TYPE: remote
@@ -58,6 +72,89 @@ rabbitmq:
   auth:
     username: guest
     password: guest
+
+
+# Celery configurations
+celeryTTS:
+  image:
+    repository: huzaifagill234/voice-ai-web
+    tag: ci
+    pullPolicy: Always
+
+  replicaCount: 1
+
+  brokerUrl: "amqp://guest:guest@voice-ai-rabbitmq:5672/"
+  resultBackend: "redis://voice-ai-redis-master:6379/0"
+
+  env:
+    POSTGRES_HOST: voice-ai-postgresql
+    POSTGRES_DB: voice_ai_db
+    POSTGRES_PORT: 5432
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    REDIS_HOST: voice-ai-redis-master
+    RABBITMQ_HOST: voice-ai-rabbitmq
+    RABBITMQ_USER: guest
+    RABBITMQ_PASSWORD: guest
+    RABBITMQ_URL: amqp://guest:guest@voice-ai-rabbitmq:5672//
+    REDIS_URL: redis://voice-ai-redis-master:6379/0
+    GOOGLE_USER_EMAIL: voiceai3004@gmail.com
+    ALLOWED_HOSTS: "voice-ai,voice-ai.default.svc.cluster.local,localhost,127.0.0.1"
+    ENVIRONMENT: infra-test
+
+  worker:
+    concurrency: 1
+    queues:
+      - tts_tasks
+
+  resources:
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+    limits:
+      cpu: "2"
+      memory: "6Gi"
+
+celeryAudio:
+  image:
+    repository: huzaifagill234/voice-ai-web
+    tag: ci
+    pullPolicy: Always
+
+  replicaCount: 1
+
+  brokerUrl: "amqp://guest:guest@voice-ai-rabbitmq:5672/"
+  resultBackend: "redis://voice-ai-redis-master:6379/0"
+
+  env:
+    POSTGRES_HOST: voice-ai-postgresql
+    POSTGRES_DB: voice_ai_db
+    POSTGRES_PORT: 5432
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    REDIS_HOST: voice-ai-redis-master
+    RABBITMQ_HOST: voice-ai-rabbitmq
+    RABBITMQ_USER: guest
+    RABBITMQ_PASSWORD: guest
+    RABBITMQ_URL: amqp://guest:guest@voice-ai-rabbitmq:5672//
+    REDIS_URL: redis://voice-ai-redis-master:6379/0
+    GOOGLE_USER_EMAIL: voiceai3004@gmail.com
+    ALLOWED_HOSTS: "voice-ai,voice-ai.default.svc.cluster.local,localhost,127.0.0.1"
+    ENVIRONMENT: infra-test
+
+  worker:
+    concurrency: 2
+    queues:
+      - audio_tasks
+
+  resources:
+    requests:
+      cpu: "1"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "2Gi"
+      
 
 service:
   type: ClusterIP

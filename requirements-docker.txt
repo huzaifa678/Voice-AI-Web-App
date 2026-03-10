@@ -4,9 +4,10 @@ djangorestframework-simplejwt
 rest_framework_simplejwt
 channels>=4.0
 channels-redis>=4.1
-torch>=2.4,<3.0
-torchvision>=0.15,<1.0
-torchaudio>=2.0,<3.0
+torch==2.10.0+cpu
+torchvision==0.25.0+cpu
+torchaudio==2.10.0+cpu
+torchcodec==0.10.0
 faster-whisper>=1.2.0
 silero-vad
 onnxruntime>=1.14,<2
@@ -26,12 +27,5 @@ scipy>=1.11
 aio_pika==9.5.5
 grpcio
 grpcio-tools
-pytest==8.3.4
-pytest-django==4.10.0
-pytest-asyncio==0.25.3
-flake8==7.1.2
-black==25.1.0
-autoflake==2.3.1
 TTS==0.22.0
-torchcodec
 celery

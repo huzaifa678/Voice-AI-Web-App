@@ -21,3 +21,11 @@ voice-ai-audio-worker
 {{- define "voice-ai-audio-worker.fullname" -}}
 voice-ai-audio-worker
 {{- end }}
+
+{{- define "voice-ai-tts-worker.fullname" -}}
+voice-ai-tts-worker
+{{- end }}
+
+{{- define "voice-ai-tts-worker.name" -}}
+voice-ai-tts-worker
+{{- end }}

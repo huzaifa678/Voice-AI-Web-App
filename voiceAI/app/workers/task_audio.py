@@ -1,75 +1,30 @@
-import asyncio
 import base64
-import json
-import aio_pika
+import asyncio
+
+from app.common.celery import celery_app
+from app.common.rabbit_mq import publish_audio_response
 from app.audio.services import AudioService
 from app.llm.services import LLMService
-from app.common.rabbit_mq import get_connection, publish_audio_response
 
 
-async def handle_message(message: aio_pika.IncomingMessage):
-    print("RAW MESSAGE RECEIVED:", message.body)
-    payload = json.loads(message.body)
+@celery_app.task(name="app.workers.task_audio.process_audio_task", queue="audio_tasks")
+def process_audio_task(user_id: str | None, audio_bytes_b64: str):
+    """Process an incoming audio task (Celery task)."""
 
-    try:
-        audio_bytes = base64.b64decode(payload["audio_bytes"])
+    audio_bytes = base64.b64decode(audio_bytes_b64)
 
-        print("inside the handle message method")
+    text = AudioService.process_audio(audio_bytes)
+    if not text:
+        return
 
-        text = await asyncio.to_thread(AudioService.process_audio, audio_bytes)
+    text = text.strip()
+    if not text:
+        return
 
-        if text is None:
-            print("Speech-to-text returned None")
-            await message.ack()
-            return
+    response = asyncio.run(LLMService.query_from_text_async(text=text))
 
-        text = text.strip()
+    asyncio.run(publish_audio_response(user_id=user_id, response=response))
 
-        if text == "":
-            print("Speech-to-text returned empty string")
-            await message.ack()
-            return
+    from app.workers.task_tts import process_tts_task
 
-        response = await LLMService.query_from_text_async(text=text)
-
-        print("LLM response: ", response)
-
-        await publish_audio_response(user_id=payload.get("user_id"), response=response)
-
-        connection = await get_connection()
-        channel = await connection.channel()
-        tts_message = aio_pika.Message(
-            body=json.dumps(
-                {"text": response, "user_id": payload.get("user_id")}
-            ).encode(),
-            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-        )
-        await channel.default_exchange.publish(
-            tts_message,
-            routing_key="tts_tasks",
-        )
-        print("TTS task published")
-
-        await channel.close()
-
-        await message.ack()
-
-    except Exception as e:
-        await message.nack(requeue=False)
-        raise e
-
-
-async def main():
-    connection = await get_connection()
-    channel = await connection.channel()
-    queue = await channel.declare_queue("audio_tasks", durable=True)
-
-    await queue.consume(handle_message)
-
-    print("[*] Waiting for audio tasks")
-    print(" Press CTRL + C to exit")
-    await asyncio.Future()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    process_tts_task.delay(response, user_id)

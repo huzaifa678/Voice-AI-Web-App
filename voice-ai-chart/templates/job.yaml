@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: xtts-model-download
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: xtts-downloader
+          image: python:3.11-slim
+          env:
+            - name: COQUI_TOS_AGREED
+              value: "1"
+
+          command:
+            - sh
+            - -c
+            - |
+              MODEL_DIR="/app/models/xtts/tts_models--multilingual--multi-dataset--xtts_v2"
+
+              if [ -d "$MODEL_DIR" ] && [ "$(ls -A $MODEL_DIR)" ]; then
+                echo "XTTS model already exists in PVC. Skipping download."
+                exit 0
+              fi
+
+              echo "Downloading XTTS model..."
+
+              apt-get update && apt-get install -y --no-install-recommends \
+                build-essential gcc g++ python3-dev libffi-dev pkg-config libmecab-dev git curl rustc cargo \
+                && rm -rf /var/lib/apt/lists/*
+
+              pip install --upgrade pip
+              pip install --no-cache-dir TTS==0.22.0 transformers==4.33.0
+
+              python3 - <<EOF
+              from TTS.utils.manage import ModelManager
+              manager = ModelManager()
+              manager.download_model("tts_models/multilingual/multi-dataset/xtts_v2")
+              EOF
+
+              mkdir -p $MODEL_DIR
+              cp -r /root/.local/share/tts/tts_models--multilingual--multi-dataset--xtts_v2/* $MODEL_DIR/
+          volumeMounts:
+            - name: {{ .Values.volumeMounts.xttsModel.name }}
+              mountPath: {{ .Values.volumeMounts.xttsModel.mountPath }}
+
+      volumes:
+        - name: xtts-model
+          persistentVolumeClaim:
+            claimName: {{ .Values.volumeClaim.name }}

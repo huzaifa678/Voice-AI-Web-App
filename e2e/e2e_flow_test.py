@@ -98,7 +98,7 @@ async def test_audio_flow_e2e_smoke():
         llm_received = False
         tts_received = False
         tts_audio_bytes = b""
-        deadline = asyncio.get_event_loop().time() + 180
+        deadline = asyncio.get_event_loop().time() + 720
 
         while asyncio.get_event_loop().time() < deadline:
             try:

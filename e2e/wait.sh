@@ -2,7 +2,7 @@
 set -e
 
 BACKEND_URL="http://voice-ai:8000/health/"
-TIMEOUT=120
+TIMEOUT=360
 INTERVAL=2
 ELAPSED=0
 

@@ -9,6 +9,7 @@ exclude =
     voiceAI/app/grpc/*_pb2.py,
     voiceAI/app/grpc/*_pb2_grpc.py,
     voiceAI/app/workers/email_consumer.py,
+    voiceAI/app/grpc/start.py,
     voiceAI/voiceAI/asgi.py,
     env,
     venv

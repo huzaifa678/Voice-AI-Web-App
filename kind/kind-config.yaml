@@ -1,9 +1,16 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-
 nodes:
   - role: control-plane
     extraPortMappings:
       - containerPort: 30000
         hostPort: 8000
         protocol: TCP
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            system-reserved: "cpu=500m,memory=512Mi"
+            kube-reserved: "cpu=500m,memory=512Mi"
+            eviction-hard: "memory.available<200Mi,nodefs.available<10%"

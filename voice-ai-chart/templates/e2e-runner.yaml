@@ -7,7 +7,6 @@ spec:
   template:
     spec:
       activeDeadlineSeconds: 300   
-      backoffLimit: 0
       restartPolicy: Never
       containers:
         - name: e2e
