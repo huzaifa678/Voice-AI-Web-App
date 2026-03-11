@@ -35,22 +35,21 @@ async def handle_message(message: aio_pika.IncomingMessage):
         print("LLM response: ", response)
 
         await publish_audio_response(user_id=payload.get("user_id"), response=response)
-        
+
         connection = await get_connection()
         channel = await connection.channel()
         tts_message = aio_pika.Message(
-            body=json.dumps({
-                "text": response,
-                "user_id": payload.get("user_id")
-            }).encode(),
+            body=json.dumps(
+                {"text": response, "user_id": payload.get("user_id")}
+            ).encode(),
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
         )
         await channel.default_exchange.publish(
             tts_message,
             routing_key="tts_tasks",
-        )        
+        )
         print("TTS task published")
-        
+
         await channel.close()
 
         await message.ack()

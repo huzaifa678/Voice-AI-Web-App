@@ -8,6 +8,7 @@
 
 import os
 from TTS.api import TTS
+
 model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
 model_path = os.path.join(
     os.getenv("TTS_HOME", os.path.expanduser("~/.local/share/tts")),
