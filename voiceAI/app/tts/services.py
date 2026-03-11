@@ -60,7 +60,6 @@ class TTSService:
             model = TTSService._tts_model.synthesizer.tts_model
 
             # for memory management
-            model.to("cpu")
             model.float()
             model.eval()
 
@@ -71,7 +70,7 @@ class TTSService:
                 ) = model.get_conditioning_latents(SPEAKER_WAV)
 
     @staticmethod
-    def chunk_text(text, max_chars=200):
+    def chunk_text(text, max_chars=350):
 
         words = text.split()
         chunks = []
