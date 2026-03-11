@@ -87,180 +87,87 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "voice-ai.fullname" . }}-celery-tts
+  name: {{ include "voice-ai-audio-worker.fullname" . }}
   labels:
-    app: {{ include "voice-ai.name" . }}-celery-tts
+    app: {{ include "voice-ai-audio-worker.name" . }}
 spec:
-  replicas: {{ .Values.celeryTTS.replicaCount }}
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{ include "voice-ai.name" . }}-celery-tts
+      app: {{ include "voice-ai-audio-worker.name" . }}
   template:
     metadata:
       labels:
-        app: {{ include "voice-ai.name" . }}-celery-tts
+        app: {{ include "voice-ai-audio-worker.name" . }}
     spec:
       containers:
-        - name: celery-tts
-          image: "{{ .Values.celeryTTS.image.repository }}:{{ .Values.celeryTTS.image.tag }}"
-          imagePullPolicy: {{ .Values.celeryTTS.image.pullPolicy }}
+        - name: voice-ai-audio-worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           workingDir: /app/voiceAI
           command:
-            - "sh"
-            - "-c"
-            - >
-              export GROQ_API_KEY=$(grep '^GROQ_API_KEY=' /app/.env.docker | cut -d '=' -f2) &&
-              ./wait-for-it.sh {{ .Values.celeryTTS.env.RABBITMQ_HOST }}:5672 --strict --timeout=120 &&
-              celery -A app.common.celery:celery_app worker -l info -Q {{ join "," .Values.celeryTTS.worker.queues }} --concurrency={{ .Values.celeryTTS.worker.concurrency }} --prefetch-multiplier=1 --max-tasks-per-child=50
+          - "sh"
+          - "-c"
+          - >
+            export GROQ_API_KEY=$(grep '^GROQ_API_KEY=' /app/.env.docker | cut -d '=' -f2) &&
+            ./wait-for-it.sh {{ .Values.env.RABBITMQ_HOST }}:5672 --strict --timeout=120 &&
+            python -m app.workers.task_audio
           env:
-            {{- range $key, $value := .Values.celeryTTS.env }}
+            {{- range $key, $value := .Values.env }}
+            {{- if $value }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-          resources:
-            requests:
-              cpu: {{ .Values.celeryTTS.resources.requests.cpu }}
-              memory: {{ .Values.celeryTTS.resources.requests.memory }}
-              nvidia.com/gpu: {{ index .Values.celeryTTS.resources.requests "nvidia.com/gpu" }}
-            limits:
-              cpu: {{ .Values.celeryTTS.resources.limits.cpu }}
-              memory: {{ .Values.celeryTTS.resources.limits.memory }}
-              nvidia.com/gpu: {{ index .Values.celeryTTS.resources.limits "nvidia.com/gpu" }}
-          volumeMounts:
-            - name: xtts-model
-              mountPath: /app/models/xtts
-      volumes:
-        - name: xtts-model
-          persistentVolumeClaim:
-            claimName: {{ .Values.volumeClaim.name }}
+            {{- end }}
       restartPolicy: Always
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "voice-ai.fullname" . }}-celery-audio
+  name: {{ include "voice-ai-tts-worker.fullname" . }}
   labels:
-    app: {{ include "voice-ai.name" . }}-celery-audio
+    app: {{ include "voice-ai-tts-worker.name" . }}
 spec:
-  replicas: {{ .Values.celeryAudio.replicaCount }}
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{ include "voice-ai.name" . }}-celery-audio
+      app: {{ include "voice-ai-tts-worker.name" . }}
   template:
     metadata:
       labels:
-        app: {{ include "voice-ai.name" . }}-celery-audio
+        app: {{ include "voice-ai-tts-worker.name" . }}
     spec:
       containers:
-        - name: celery-audio
-          image: "{{ .Values.celeryAudio.image.repository }}:{{ .Values.celeryAudio.image.tag }}"
-          imagePullPolicy: {{ .Values.celeryAudio.image.pullPolicy }}
+        - name: voice-ai-tts-worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           workingDir: /app/voiceAI
           command:
             - "sh"
             - "-c"
             - >
               export GROQ_API_KEY=$(grep '^GROQ_API_KEY=' /app/.env.docker | cut -d '=' -f2) &&
-              ./wait-for-it.sh {{ .Values.celeryAudio.env.RABBITMQ_HOST }}:5672 --strict --timeout=120 &&
-              celery -A app.common.celery:celery_app worker -l info -Q {{ join "," .Values.celeryAudio.worker.queues }} --concurrency={{ .Values.celeryAudio.worker.concurrency }} --prefetch-multiplier=1 --max-tasks-per-child=50
+              ./wait-for-it.sh {{ .Values.env.RABBITMQ_HOST }}:5672 --strict --timeout=120 &&
+              python -m app.workers.task_tts
           env:
-            {{- range $key, $value := .Values.celeryAudio.env }}
+            {{- range $key, $value := .Values.env }}
+            {{- if $value }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- end }}
+          volumeMounts:
+            - name: xtts-model
+              mountPath: /app/models
           resources:
             requests:
-              cpu: {{ .Values.celeryAudio.resources.requests.cpu }}
-              memory: {{ .Values.celeryAudio.resources.requests.memory }}
+              cpu: "500m"
+              memory: "1Gi"
             limits:
-              cpu: {{ .Values.celeryAudio.resources.limits.cpu }}
-              memory: {{ .Values.celeryAudio.resources.limits.memory }}
-# apiVersion: apps/v1
-# kind: Deployment
-# metadata:
-#   name: {{ include "voice-ai-audio-worker.fullname" . }}
-#   labels:
-#     app: {{ include "voice-ai-audio-worker.name" . }}
-# spec:
-#   replicas: {{ .Values.replicaCount }}
-#   selector:
-#     matchLabels:
-#       app: {{ include "voice-ai-audio-worker.name" . }}
-#   template:
-#     metadata:
-#       labels:
-#         app: {{ include "voice-ai-audio-worker.name" . }}
-#     spec:
-#       containers:
-#         - name: voice-ai-audio-worker
-#           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-#           imagePullPolicy: {{ .Values.image.pullPolicy }}
-#           workingDir: /app/voiceAI
-#           command:
-#           - "sh"
-#           - "-c"
-#           - >
-#             export GROQ_API_KEY=$(grep '^GROQ_API_KEY=' /app/.env.docker | cut -d '=' -f2) &&
-#             ./wait-for-it.sh {{ .Values.env.RABBITMQ_HOST }}:5672 --strict --timeout=120 &&
-#             python -m app.workers.task_audio
-#           env:
-#             {{- range $key, $value := .Values.env }}
-#             {{- if $value }}
-#             - name: {{ $key }}
-#               value: {{ $value | quote }}
-#             {{- end }}
-#             {{- end }}
-#       restartPolicy: Always
----
-# apiVersion: apps/v1
-# kind: Deployment
-# metadata:
-#   name: {{ include "voice-ai-tts-worker.fullname" . }}
-#   labels:
-#     app: {{ include "voice-ai-tts-worker.name" . }}
-# spec:
-#   replicas: {{ .Values.replicaCount }}
-#   selector:
-#     matchLabels:
-#       app: {{ include "voice-ai-tts-worker.name" . }}
-#   template:
-#     metadata:
-#       labels:
-#         app: {{ include "voice-ai-tts-worker.name" . }}
-#     spec:
-#       containers:
-#         - name: voice-ai-tts-worker
-#           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-#           imagePullPolicy: {{ .Values.image.pullPolicy }}
-#           workingDir: /app/voiceAI
-#           command:
-#             - "sh"
-#             - "-c"
-#             - >
-#               export GROQ_API_KEY=$(grep '^GROQ_API_KEY=' /app/.env.docker | cut -d '=' -f2) &&
-#               ./wait-for-it.sh {{ .Values.env.RABBITMQ_HOST }}:5672 --strict --timeout=120 &&
-#               python -m app.workers.task_tts
-#           env:
-#             {{- range $key, $value := .Values.env }}
-#             {{- if $value }}
-#             - name: {{ $key }}
-#               value: {{ $value | quote }}
-#             {{- end }}
-#             {{- end }}
-#           volumeMounts:
-#             - name: xtts-model
-#               mountPath: /app/models
-#           resources:
-#             requests:
-#               cpu: "500m"
-#               memory: "1Gi"
-#             limits:
-#               cpu: "1000m"
-#               memory: "2Gi"
-
-#       volumes:
-#         - name: xtts-model
-#           persistentVolumeClaim:
-#             claimName: {{ .Values.volumeClaim.name }}
-
-#       restartPolicy: Always
+              cpu: "1000m"
+              memory: "2Gi"
+      volumes:
+        - name: xtts-model
+          persistentVolumeClaim:
+            claimName: {{ .Values.volumeClaim.name }}
+      restartPolicy: Always 
