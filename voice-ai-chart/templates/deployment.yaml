@@ -121,9 +121,11 @@ spec:
             requests:
               cpu: {{ .Values.celeryTTS.resources.requests.cpu }}
               memory: {{ .Values.celeryTTS.resources.requests.memory }}
+              nvidia.com/gpu: {{ index .Values.celeryTTS.resources.requests "nvidia.com/gpu" }}
             limits:
               cpu: {{ .Values.celeryTTS.resources.limits.cpu }}
               memory: {{ .Values.celeryTTS.resources.limits.memory }}
+              nvidia.com/gpu: {{ index .Values.celeryTTS.resources.limits "nvidia.com/gpu" }}
           volumeMounts:
             - name: xtts-model
               mountPath: /app/models/xtts

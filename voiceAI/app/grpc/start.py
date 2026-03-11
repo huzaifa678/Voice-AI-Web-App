@@ -9,6 +9,7 @@ django.setup()
 
 from app.grpc.service import AudioServicer
 
+
 async def serve():
     server = grpc.aio.server()
     service_pb2_grpc.add_AudioServiceServicer_to_server(AudioServicer(), server)
@@ -17,6 +18,7 @@ async def serve():
     print(f"gRPC server listening on {listen_addr}")
     await server.start()
     await server.wait_for_termination()
+
 
 if __name__ == "__main__":
     asyncio.run(serve())

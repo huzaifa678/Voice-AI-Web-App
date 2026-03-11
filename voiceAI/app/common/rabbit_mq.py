@@ -11,6 +11,7 @@ _channel = None
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL") or os.getenv("CELERY_BROKER_URL")
 
+
 def get_channel():
     global _connection, _channel
 

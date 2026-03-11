@@ -11,6 +11,7 @@ load_dotenv()
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
 django.setup()
 
+
 @celery_app.task(name="app.workers.task_email.send_welcome_email", queue="email_tasks")
 def send_welcome_email(email_data: dict):
     """Send a welcome email using Django's send_mail."""

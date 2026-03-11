@@ -8,10 +8,11 @@
 
 import os
 from TTS.api import TTS
-from TTS.utils.manage import ModelManager
-
 model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
-model_path = os.path.join(os.getenv("TTS_HOME", os.path.expanduser("~/.local/share/tts")), model_name.replace("/", "--"))
+model_path = os.path.join(
+    os.getenv("TTS_HOME", os.path.expanduser("~/.local/share/tts")),
+    model_name.replace("/", "--"),
+)
 
 os.makedirs(model_path, exist_ok=True)
 
