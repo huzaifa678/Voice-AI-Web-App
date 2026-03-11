@@ -163,9 +163,11 @@ spec:
             requests:
               cpu: "500m"
               memory: "1Gi"
+              nvidia.com/gpu: 1 
             limits:
               cpu: "1000m"
               memory: "2Gi"
+              nvidia.com/gpu: 1 
       volumes:
         - name: xtts-model
           persistentVolumeClaim:
