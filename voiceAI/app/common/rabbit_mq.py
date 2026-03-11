@@ -11,7 +11,6 @@ _channel = None
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL") or os.getenv("CELERY_BROKER_URL")
 
-
 def get_channel():
     global _connection, _channel
 
@@ -43,11 +42,23 @@ async def get_connection():
 
 
 async def publish_audio_task(user_id: str, audio_bytes: bytes):
-    """Publish an audio task into the Celery queue."""
 
-    from app.workers.task_audio import process_audio_task
+    channel = await get_persistent_channel()
 
-    process_audio_task.delay(user_id, base64.b64encode(audio_bytes).decode())
+    await channel.declare_queue("audio_tasks", durable=True)
+
+    payload = {
+        "user_id": user_id,
+        "audio_bytes": base64.b64encode(audio_bytes).decode(),
+    }
+
+    await channel.default_exchange.publish(
+        aio_pika.Message(
+            body=json.dumps(payload).encode(),
+            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+        ),
+        routing_key="audio_tasks",
+    )
 
 
 async def publish_audio_response(

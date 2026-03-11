@@ -8,7 +8,7 @@ from pydub import AudioSegment
 from silero_vad import get_speech_timestamps, load_silero_vad
 from app.common.rabbit_mq import publish_audio_task
 
-ENVIRONMENT = ("ENVIRONMENT", "local")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
 executor = ThreadPoolExecutor(max_workers=2)
 
