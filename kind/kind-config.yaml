@@ -1,11 +1,23 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+
 nodes:
   - role: control-plane
     extraPortMappings:
       - containerPort: 30000
         hostPort: 8000
         protocol: TCP
+
+    extraMounts:
+      - hostPath: /dev/nvidia0
+        containerPath: /dev/nvidia0
+      - hostPath: /dev/nvidiactl
+        containerPath: /dev/nvidiactl
+      - hostPath: /dev/nvidia-uvm
+        containerPath: /dev/nvidia-uvm
+      - hostPath: /dev/nvidia-modeset
+        containerPath: /dev/nvidia-modeset
+
     kubeadmConfigPatches:
       - |
         kind: InitConfiguration
