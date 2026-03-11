@@ -70,7 +70,7 @@ class TTSService:
                 ) = model.get_conditioning_latents(SPEAKER_WAV)
 
     @staticmethod
-    def chunk_text(text, max_chars=350):
+    def chunk_text(text, max_chars=200):
 
         words = text.split()
         chunks = []
