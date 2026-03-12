@@ -158,7 +158,7 @@ spec:
             {{- end }}
           volumeMounts:
             - name: xtts-model
-              mountPath: /app/models
+              mountPath: /app/models/xtts
           resources:
             requests:
               cpu: "500m"
