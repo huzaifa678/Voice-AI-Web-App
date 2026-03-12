@@ -48,7 +48,7 @@ async def handle_message(message: aio_pika.IncomingMessage):
             ).encode(),
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
         )
-        
+
         await channel.default_exchange.publish(
             tts_message,
             routing_key="tts_tasks",
@@ -68,6 +68,7 @@ async def main():
     connection = await get_connection()
     channel = await connection.channel()
     queue = await channel.declare_queue("audio_tasks", durable=True)
+    await channel.declare_queue("tts_tasks", durable=True)
 
     await queue.consume(handle_message)
 
