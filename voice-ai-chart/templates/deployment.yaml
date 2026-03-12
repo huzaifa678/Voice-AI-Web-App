@@ -161,11 +161,11 @@ spec:
               mountPath: /app/models/xtts
           resources:
             requests:
-              cpu: "500m"
+              cpu: "1"
               memory: "4Gi"
               nvidia.com/gpu: 1 
             limits:
-              cpu: "1000m"
+              cpu: "2"
               memory: "6Gi"
               nvidia.com/gpu: 1 
       volumes:
