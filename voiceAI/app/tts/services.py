@@ -60,7 +60,7 @@ class TTSService:
                 model = model.half()
 
             model.eval()
-
+            
             TTSService._tts_model.synthesizer.tts_model = model
 
             TTSService._precompute_speaker()

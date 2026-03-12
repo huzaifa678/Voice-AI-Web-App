@@ -162,11 +162,11 @@ spec:
           resources:
             requests:
               cpu: "500m"
-              memory: "1Gi"
+              memory: "4Gi"
               nvidia.com/gpu: 1 
             limits:
               cpu: "1000m"
-              memory: "2Gi"
+              memory: "6Gi"
               nvidia.com/gpu: 1 
       volumes:
         - name: xtts-model
