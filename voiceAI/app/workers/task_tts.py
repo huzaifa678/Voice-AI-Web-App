@@ -6,6 +6,8 @@ from app.common.rabbit_mq import get_connection, publish_audio_response
 from app.tts.services import TTSService
 
 
+TTSService.load_model(async_load=True)
+
 async def handle_tts_message(message: aio_pika.IncomingMessage):
     payload = json.loads(message.body)
 
