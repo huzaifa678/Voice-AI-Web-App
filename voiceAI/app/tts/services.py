@@ -94,16 +94,13 @@ class TTSService:
 
     @staticmethod
     def synthesize(text: str, language="en", sample_rate=24000) -> bytes:
-        tts = TTSService.load_model(async_load=False)
-        if tts is None:
-            raise RuntimeError("TTS model is still loading")
+        if TTSService._tts_model is None:
+            raise RuntimeError("TTS model is not loaded yet")
 
-        model = tts.synthesizer.tts_model
+        model = TTSService._tts_model.synthesizer.tts_model
 
         sentences = re.split(r"(?<=[.!?]) +", text)
-        chunks = []
-        for sentence in sentences:
-            chunks.extend(TTSService.chunk_text(sentence))
+        chunks = sum([TTSService.chunk_text(s) for s in sentences], [])
 
         all_wavs = []
         for chunk in chunks:
@@ -116,8 +113,7 @@ class TTSService:
                     TTSService._gpt_cond_latent,
                     TTSService._speaker_embedding,
                 )
-            wav = result["wav"]
-            all_wavs.append(np.array(wav, dtype=np.float32))
+            all_wavs.append(np.array(result["wav"], dtype=np.float32))
 
         if not all_wavs:
             return b""
