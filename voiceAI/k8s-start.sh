@@ -31,6 +31,9 @@ fi
 # echo "Starting RabbitMQ email worker..."
 # python -m app.workers.task_email &
 
+echo "Starting Celery worker..."
+celery -A app.common.celery worker --loglevel=info -P solo &
+
 echo "Starting Django server..."
 exec uvicorn voiceAI.asgi:application \
   --host 0.0.0.0 \
