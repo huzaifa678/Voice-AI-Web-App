@@ -11,6 +11,8 @@ from TTS.config.shared_configs import BaseDatasetConfig
 torch.set_num_threads(2)
 torch.set_num_interop_threads(1)
 
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
 XTTS_MODEL_NAME = "tts_models/multilingual/multi-dataset/xtts_v2"
@@ -39,14 +41,27 @@ class TTSService:
 
             if ENVIRONMENT == "local":
                 TTSService._tts_model = TTS(
-                    model_name=XTTS_MODEL_NAME, progress_bar=False
+                    model_name=XTTS_MODEL_NAME,
+                    progress_bar=False,
+                    gpu=torch.cuda.is_available(),
                 )
             else:
                 TTSService._tts_model = TTS(
-                    model_path=f"{XTTS_PATH}",
+                    model_path=XTTS_PATH,
                     config_path=f"{XTTS_PATH}/config.json",
                     progress_bar=False,
+                    gpu=torch.cuda.is_available(),
                 )
+
+            model = TTSService._tts_model.synthesizer.tts_model
+            model = model.to(DEVICE)
+
+            if DEVICE == "cuda":
+                model = model.half()
+
+            model.eval()
+
+            TTSService._tts_model.synthesizer.tts_model = model
 
             TTSService._precompute_speaker()
 
@@ -58,10 +73,6 @@ class TTSService:
         if TTSService._speaker_embedding is None:
 
             model = TTSService._tts_model.synthesizer.tts_model
-
-            # for memory management
-            model.float()
-            model.eval()
 
             with torch.no_grad():
                 (
@@ -111,6 +122,7 @@ class TTSService:
                 continue
 
             with torch.inference_mode():
+
                 result = model.inference(
                     chunk,
                     language,
@@ -132,7 +144,11 @@ class TTSService:
         buffer = io.BytesIO()
 
         sf.write(
-            buffer, wav_int16, samplerate=sample_rate, format="WAV", subtype="PCM_16"
+            buffer,
+            wav_int16,
+            samplerate=sample_rate,
+            format="WAV",
+            subtype="PCM_16",
         )
 
         buffer.seek(0)
