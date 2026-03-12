@@ -4,6 +4,7 @@ metadata:
   name: xtts-model-download
 spec:
   backoffLimit: 3
+  activeDeadlineSeconds: 1200
   template:
     spec:
       restartPolicy: OnFailure
