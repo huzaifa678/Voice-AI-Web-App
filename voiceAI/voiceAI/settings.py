@@ -64,16 +64,6 @@ REST_FRAMEWORK = {
 }
 
 CELERY_TASK_QUEUES = {
-    "audio_tasks": {
-        "exchange": "audio_tasks",
-        "routing_key": "audio_tasks",
-        "durable": True,
-    },
-    "tts_tasks": {
-        "exchange": "tts_tasks",
-        "routing_key": "tts_tasks",
-        "durable": True,
-    },
     "email_tasks": {
         "exchange": "email_tasks",
         "routing_key": "email_tasks",

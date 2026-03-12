@@ -25,11 +25,9 @@ class TTSService:
     _speaker_embedding = None
     _gpt_cond_latent = None
     _model_lock = threading.Lock()
-    _loading_thread = None
 
     @staticmethod
     def _load_model_sync():
-        """Actual blocking model load"""
         torch.serialization.add_safe_globals(
             [XttsConfig, XttsAudioConfig, BaseDatasetConfig, XttsArgs]
         )
@@ -65,23 +63,18 @@ class TTSService:
 
     @staticmethod
     def load_model(async_load=False):
-        """Load XTTS model once, optionally asynchronously"""
-        if TTSService._tts_model is not None:
-            return TTSService._tts_model
+        """Thread-safe model loader"""
+        with TTSService._model_lock:
+            if TTSService._tts_model is not None:
+                return TTSService._tts_model
 
-        if async_load:
-            if TTSService._loading_thread is None:
-                TTSService._loading_thread = threading.Thread(
-                    target=TTSService._load_model_sync
-                )
-                TTSService._loading_thread.start()
-            return None
-        else:
-            with TTSService._model_lock:
-                if TTSService._tts_model is None:
-                    TTSService._load_model_sync()
-            return TTSService._tts_model
-
+            if async_load:
+                threading.Thread(target=TTSService._load_model_sync, daemon=True).start()
+                return None
+            else:
+                TTSService._load_model_sync()
+                return TTSService._tts_model
+            
     @staticmethod
     def chunk_text(text, max_chars=200):
         words = text.split()
@@ -98,8 +91,13 @@ class TTSService:
 
     @staticmethod
     def synthesize(text: str, language="en", sample_rate=24000) -> bytes:
+        # Thread-safe check and load
         if TTSService._tts_model is None:
-            raise RuntimeError("TTS model is not loaded yet")
+            with TTSService._model_lock:
+                if TTSService._tts_model is None:
+                    TTSService._load_model_sync()
+
+        print("MODEL LOADED")
 
         model = TTSService._tts_model.synthesizer.tts_model
 
@@ -108,6 +106,7 @@ class TTSService:
 
         all_wavs = []
         for chunk in chunks:
+            print("CHUNKS")
             if not chunk.strip():
                 continue
             with torch.inference_mode(), torch.autocast(
@@ -127,8 +126,7 @@ class TTSService:
         combined = np.concatenate(all_wavs)
         wav_int16 = (combined * 32767).astype(np.int16)
         buffer = io.BytesIO()
-        sf.write(
-            buffer, wav_int16, samplerate=sample_rate, format="WAV", subtype="PCM_16"
-        )
+        sf.write(buffer, wav_int16, samplerate=sample_rate, format="WAV", subtype="PCM_16")
         buffer.seek(0)
+        print("SYNTHESIZE DONE")
         return buffer.read()

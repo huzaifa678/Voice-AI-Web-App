@@ -36,6 +36,7 @@ async def handle_message(message: aio_pika.IncomingMessage):
         response = await LLMService.query_from_text_async(text=text)
 
         print("LLM response: ", response)
+        print("Length of TTS payload text:", len(response))
 
         await publish_audio_response(user_id=payload.get("user_id"), response=response)
 
@@ -47,6 +48,7 @@ async def handle_message(message: aio_pika.IncomingMessage):
                 {"text": response, "user_id": payload.get("user_id")}
             ).encode(),
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            content_type="application/json"
         )
 
         print("Publishing TTS payload:", json.dumps({"text": response, "user_id": payload.get("user_id")}))

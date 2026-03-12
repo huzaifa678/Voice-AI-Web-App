@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import os
+import time  # <-- add this
 import aio_pika
 from app.common.rabbit_mq import get_connection, publish_audio_response
 from app.tts.services import TTSService
@@ -16,8 +17,13 @@ async def handle_tts_message(message: aio_pika.IncomingMessage):
 
     try:
         print("inside the handle tts message method")
-
+        
+        start_time = time.time()  # start timer
+        # Synthesize audio in a thread (blocks TTS CPU/GPU work here)
         audio_bytes = await asyncio.to_thread(TTSService.synthesize, text)
+        end_time = time.time()  # end timer
+
+        print(f"TTS synthesis took {end_time - start_time:.2f} seconds for text length {len(text)}")
 
         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
 
@@ -32,8 +38,7 @@ async def handle_tts_message(message: aio_pika.IncomingMessage):
     except Exception as e:
         await message.nack(requeue=False)
         raise e
-
-
+    
 async def main():
     connection = await get_connection()
     channel = await connection.channel()
