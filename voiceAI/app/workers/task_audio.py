@@ -49,6 +49,9 @@ async def handle_message(message: aio_pika.IncomingMessage):
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
         )
 
+        print("Publishing TTS payload:", json.dumps({"text": response, "user_id": payload.get("user_id")}))
+        print("Publishing TTS message:", tts_message)
+
         await channel.default_exchange.publish(
             tts_message,
             routing_key="tts_tasks",
