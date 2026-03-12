@@ -4,6 +4,7 @@ metadata:
   name: voice-ai-e2e
 spec:
   backoffLimit: 0
+  activeDeadlineSeconds: 1200
   template:
     spec:
       activeDeadlineSeconds: 300   

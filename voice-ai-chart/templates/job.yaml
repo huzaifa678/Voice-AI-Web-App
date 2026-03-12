@@ -3,8 +3,7 @@ kind: Job
 metadata:
   name: xtts-model-download
 spec:
-  backoffLimit: 3
-  activeDeadlineSeconds: 1200
+  backoffLimit: 3 
   template:
     spec:
       restartPolicy: OnFailure
