@@ -1,10 +1,13 @@
 import asyncio
 import base64
 import json
+import os
 import aio_pika
 from app.audio.services import AudioService
 from app.llm.services import LLMService
 from app.common.rabbit_mq import get_connection, publish_audio_response
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
 
 async def handle_message(message: aio_pika.IncomingMessage):
@@ -38,12 +41,14 @@ async def handle_message(message: aio_pika.IncomingMessage):
 
         connection = await get_connection()
         channel = await connection.channel()
+
         tts_message = aio_pika.Message(
             body=json.dumps(
                 {"text": response, "user_id": payload.get("user_id")}
             ).encode(),
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
         )
+        
         await channel.default_exchange.publish(
             tts_message,
             routing_key="tts_tasks",

@@ -38,12 +38,13 @@ async def main():
     connection = await get_connection()
     channel = await connection.channel()
 
+    queue = await channel.declare_queue("tts_tasks", durable=True)
+
     if ENVIRONMENT != "local":
         print("[*] Loading XTTS Model into GPU...")
         await asyncio.to_thread(TTSService.load_model, async_load=False)
         print("[*] Model Loaded. Starting consumer.")
 
-    queue = await channel.declare_queue("tts_tasks", durable=True)
     await queue.consume(handle_tts_message)
     print("[*] Waiting for TTS tasks")
     await asyncio.Future()
