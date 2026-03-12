@@ -5,9 +5,6 @@ import aio_pika
 from app.common.rabbit_mq import get_connection, publish_audio_response
 from app.tts.services import TTSService
 
-
-TTSService.load_model(async_load=True)
-
 async def handle_tts_message(message: aio_pika.IncomingMessage):
     payload = json.loads(message.body)
 
@@ -41,7 +38,7 @@ async def main():
     print("[*] Loading XTTS Model into GPU...")
     await asyncio.to_thread(TTSService.load_model, async_load=False)
     print("[*] Model Loaded. Starting consumer.")
-    
+
     queue = await channel.declare_queue("tts_tasks", durable=True)
     await queue.consume(handle_tts_message)
     print("[*] Waiting for TTS tasks")
