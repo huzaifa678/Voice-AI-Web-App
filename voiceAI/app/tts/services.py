@@ -11,6 +11,8 @@ from TTS.config.shared_configs import BaseDatasetConfig
 
 torch.set_num_threads(2)
 torch.set_num_interop_threads(1)
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
@@ -106,19 +108,22 @@ class TTSService:
 
         all_wavs = []
         for chunk in chunks:
-            print("CHUNKS")
             if not chunk.strip():
                 continue
-            with torch.inference_mode(), torch.autocast(
-                "cuda" if DEVICE == "cuda" else "cpu"
-            ):
+
+            with torch.inference_mode():
                 result = model.inference(
                     chunk,
                     language,
                     TTSService._gpt_cond_latent,
                     TTSService._speaker_embedding,
                 )
-            all_wavs.append(np.array(result["wav"], dtype=np.float32))
+
+            wav = result["wav"]
+            if isinstance(wav, torch.Tensor):
+                wav = wav.float().cpu().numpy()
+
+            all_wavs.append(np.array(wav, dtype=np.float32))
 
         if not all_wavs:
             return b""
