@@ -49,15 +49,17 @@ class TTSService:
                 gpu=torch.cuda.is_available(),
             )
 
-        model = TTSService._tts_model.synthesizer.tts_model
-        model = model.to(DEVICE)
-        if DEVICE == "cuda":
-            model = model.half()
-        model.eval()
-        TTSService._tts_model.synthesizer.tts_model = model
+        model = TTSService._tts_model.synthesizer.tts_model.to(DEVICE)
 
         with torch.no_grad():
             TTSService._gpt_cond_latent, TTSService._speaker_embedding = model.get_conditioning_latents(SPEAKER_WAV)
+
+        if DEVICE == "cuda":
+            model = model.half()
+            TTSService._gpt_cond_latent = TTSService._gpt_cond_latent.half()
+            TTSService._speaker_embedding = TTSService._speaker_embedding.half()
+
+        model.eval()
 
     @staticmethod
     def load_model(async_load=False):

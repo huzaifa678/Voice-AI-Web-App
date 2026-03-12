@@ -37,6 +37,11 @@ async def handle_tts_message(message: aio_pika.IncomingMessage):
 async def main():
     connection = await get_connection()
     channel = await connection.channel()
+
+    print("[*] Loading XTTS Model into GPU...")
+    await asyncio.to_thread(TTSService.load_model, async_load=False)
+    print("[*] Model Loaded. Starting consumer.")
+    
     queue = await channel.declare_queue("tts_tasks", durable=True)
     await queue.consume(handle_tts_message)
     print("[*] Waiting for TTS tasks")
