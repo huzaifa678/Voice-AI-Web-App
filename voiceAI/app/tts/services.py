@@ -52,7 +52,9 @@ class TTSService:
         model = TTSService._tts_model.synthesizer.tts_model.to(DEVICE)
 
         with torch.no_grad():
-            TTSService._gpt_cond_latent, TTSService._speaker_embedding = model.get_conditioning_latents(SPEAKER_WAV)
+            TTSService._gpt_cond_latent, TTSService._speaker_embedding = (
+                model.get_conditioning_latents(SPEAKER_WAV)
+            )
 
         if DEVICE == "cuda":
             model = model.half()
@@ -69,9 +71,11 @@ class TTSService:
 
         if async_load:
             if TTSService._loading_thread is None:
-                TTSService._loading_thread = threading.Thread(target=TTSService._load_model_sync)
+                TTSService._loading_thread = threading.Thread(
+                    target=TTSService._load_model_sync
+                )
                 TTSService._loading_thread.start()
-            return None  
+            return None
         else:
             with TTSService._model_lock:
                 if TTSService._tts_model is None:
@@ -106,7 +110,9 @@ class TTSService:
         for chunk in chunks:
             if not chunk.strip():
                 continue
-            with torch.inference_mode(), torch.autocast("cuda" if DEVICE=="cuda" else "cpu"):
+            with torch.inference_mode(), torch.autocast(
+                "cuda" if DEVICE == "cuda" else "cpu"
+            ):
                 result = model.inference(
                     chunk,
                     language,
@@ -121,6 +127,8 @@ class TTSService:
         combined = np.concatenate(all_wavs)
         wav_int16 = (combined * 32767).astype(np.int16)
         buffer = io.BytesIO()
-        sf.write(buffer, wav_int16, samplerate=sample_rate, format="WAV", subtype="PCM_16")
+        sf.write(
+            buffer, wav_int16, samplerate=sample_rate, format="WAV", subtype="PCM_16"
+        )
         buffer.seek(0)
         return buffer.read()

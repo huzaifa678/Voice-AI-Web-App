@@ -1,17 +1,20 @@
 import asyncio
 import base64
 import json
+import os
 import aio_pika
 from app.common.rabbit_mq import get_connection, publish_audio_response
 from app.tts.services import TTSService
 
+ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
+
+
 async def handle_tts_message(message: aio_pika.IncomingMessage):
     payload = json.loads(message.body)
+    text = payload["text"]
+    user_id = payload["user_id"]
 
     try:
-        text = payload["text"]
-        user_id = payload["user_id"]
-
         print("inside the handle tts message method")
 
         audio_bytes = await asyncio.to_thread(TTSService.synthesize, text)
@@ -35,9 +38,10 @@ async def main():
     connection = await get_connection()
     channel = await connection.channel()
 
-    print("[*] Loading XTTS Model into GPU...")
-    await asyncio.to_thread(TTSService.load_model, async_load=False)
-    print("[*] Model Loaded. Starting consumer.")
+    if ENVIRONMENT != "local":
+        print("[*] Loading XTTS Model into GPU...")
+        await asyncio.to_thread(TTSService.load_model, async_load=False)
+        print("[*] Model Loaded. Starting consumer.")
 
     queue = await channel.declare_queue("tts_tasks", durable=True)
     await queue.consume(handle_tts_message)
