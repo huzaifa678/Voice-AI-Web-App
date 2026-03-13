@@ -1,7 +1,7 @@
 # Voice-AI-Web-App
 
 ![CI](https://github.com/huzaifa678/Voice-AI-Web-App/actions/workflows/ci.yml/badge.svg)
-![E2E Tests](https://img.shields.io/badge/E2E%20Passing-brightgreen)
+![E2E Tests](https://img.shields.io/badge/E2E%20Tests-Passing-brightgreen)
 ![Integration Tests](https://img.shields.io/badge/Integration%20Tests-Passing-brightgreen)
 
 ## General Flow of the Web App:
