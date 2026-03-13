@@ -1,5 +1,7 @@
 # Voice-AI-Web-App
 
+![CI](https://github.com/huzaifa678/Voice-AI-Web-App/actions/workflows/ci.yml/badge.svg)
+
 ## General Flow of the Web App:
 
 1. User registers -> User login -> DB store via postgres
