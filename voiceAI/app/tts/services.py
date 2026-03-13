@@ -71,12 +71,14 @@ class TTSService:
                 return TTSService._tts_model
 
             if async_load:
-                threading.Thread(target=TTSService._load_model_sync, daemon=True).start()
+                threading.Thread(
+                    target=TTSService._load_model_sync, daemon=True
+                ).start()
                 return None
             else:
                 TTSService._load_model_sync()
                 return TTSService._tts_model
-            
+
     @staticmethod
     def chunk_text(text, max_chars=200):
         words = text.split()
@@ -131,7 +133,9 @@ class TTSService:
         combined = np.concatenate(all_wavs)
         wav_int16 = (combined * 32767).astype(np.int16)
         buffer = io.BytesIO()
-        sf.write(buffer, wav_int16, samplerate=sample_rate, format="WAV", subtype="PCM_16")
+        sf.write(
+            buffer, wav_int16, samplerate=sample_rate, format="WAV", subtype="PCM_16"
+        )
         buffer.seek(0)
         print("SYNTHESIZE DONE")
         return buffer.read()
