@@ -13,7 +13,7 @@
 * **Django:** As the Backend Framework for defining the api endpoints for the REST server, configuring the REST server, Websocket server and the gRPC server for startup logic and graceful shutdown, setting variables for the RabbitMQ email worker to use and starting all three servers via the addition of uvicorn server
 * **Whisper AI:** As the AI model for converting audio to text
 * **Silero VAD:** As the AI model for speech detection based on the probability ensuring silence timeout and perfect speech detection
-* **XTTS v2 endcoder** As the Encoder for converting text to speech
+* **XTTS v2 encoder** As the Encoder for converting text to speech
 * **Postgres:** Used as the DBMS for storing user credentials and token using the Django Database
 * **Pgbouncer**: Used for connection pooling for live connections 
 * **Next:** As the Frontend Framework for prompting the user to register or/and login with the mic audio streaming for sending the continious streams to the Backend
@@ -30,6 +30,9 @@
 
   * ensure the python interpeter version 3.11 or above is installed
   * ensure Docker is installed on the machine
+  * ensure kind and kubectl is installed
+  * ensure Helm is installed
+
 * **Build the Docker image:**
 
   ```bash
@@ -58,15 +61,15 @@
   docker compose up -d
   ```
 
-**Running on Kind Cluster:** 
+* **Running on Kind Cluster:** 
 
+    ```bash
+    cd kind
+    chmod +x ./create-cluster.sh
+    ./create-cluster.sh
+    ```
+
+* **Deploying with Helm:**
   ```bash
-  cd kind
-  chmod +x ./create-cluster.sh
-  ./create-cluster.sh
-  ```
-
-**Deploying with Helm:**
-```bash
-cd voice-ai-chart
-helm upgrade --install voice-ai ./
+  cd voice-ai-chart
+  helm upgrade --install voice-ai ./
