@@ -13,12 +13,15 @@
 * **Django:** As the Backend Framework for defining the api endpoints for the REST server, configuring the REST server, Websocket server and the gRPC server for startup logic and graceful shutdown, setting variables for the RabbitMQ email worker to use and starting all three servers via the addition of uvicorn server
 * **Whisper AI:** As the AI model for converting audio to text
 * **Silero VAD:** As the AI model for speech detection based on the probability ensuring silence timeout and perfect speech detection
+* **XTTS v2 endcoder** As the Encoder for converting text to speech
 * **Postgres:** Used as the DBMS for storing user credentials and token using the Django Database
 * **Pgbouncer**: Used for connection pooling for live connections 
 * **Next:** As the Frontend Framework for prompting the user to register or/and login with the mic audio streaming for sending the continious streams to the Backend
 * **RabbitMQ:** Used as the Message Queue for sending email to the user after it registers, send ing the audio converted to speech to the worker handler subscibing to the queue and for delivering the LLM response to the web socket LLM listener
 * **Redis:** Used for rate limiting the API requests to the Backend
 * **Docker:** Used for containerzing the Web Application and for starting and running the DB, Message Queue and API rate limiter containers
+* **Kubernetes** Used for orchestration of Infra pods and the application pods
+* **Helm** Used for packaging the application with resuable infra Helm Charts(Poatgres, RabbitMQ, Redis)
 
 ## Guidelines for starting with the web app
 
@@ -54,3 +57,16 @@
   ```bash
   docker compose up -d
   ```
+
+**Running on Kind Cluster:** 
+
+  ```bash
+  cd kind
+  chmod +x ./create-cluster.sh
+  ./create-cluster.sh
+  ```
+
+**Deploying with Helm:**
+```bash
+cd voice-ai-chart
+helm upgrade --install voice-ai ./
