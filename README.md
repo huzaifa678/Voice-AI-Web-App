@@ -34,7 +34,7 @@
 
 * **Next:** As the Frontend Framework for prompting the user to register or/and login with the mic audio streaming for sending the continious streams to the Backend
 
-* **RabbitMQ:** Used as the Message Queue for sending email to the user after it registers, send ing the audio converted to speech to the worker handler subscibing to the queue and for delivering the LLM response to the web socket LLM listener and the TTS worker response to the same listener
+* **RabbitMQ:** Used as the Message Queue for sending email to the user after it registers, sending the audio converted to speech to the worker handler subscibing to the queue and for delivering the LLM response to the web socket LLM listener and the TTS worker response to the same listener
 
 * **Redis:** Used for rate limiting the API requests to the Backend
 
