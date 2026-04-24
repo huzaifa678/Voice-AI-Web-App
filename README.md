@@ -100,4 +100,4 @@
 
  ## Important Clarification
 
- As the XTTS model is heavy and resource intensive use on-premise GPU or a GPU based cloud VM instance such as the EC2 `g4ndxlarge` instance or equivilant to another alternative cloud provider VM service
+ As the XTTS model is heavy and resource intensive use on-premise GPU or a GPU based cloud VM instance such as the EC2 `g4dn.xlarge` instance or equivilant to another alternative cloud provider VM service
