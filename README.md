@@ -30,7 +30,7 @@
 
 * **Postgres:** Used as the DBMS for storing user credentials and token using the Django user model and for storing voice chat sessions
 
-* **Pgbouncer**: Used for connection pooling for live connections 
+* **Pgbouncer**: Used as the connection pooler for connection pooling the live DB connections from the client
 
 * **Next:** As the Frontend Framework for prompting the user to register or/and login with the mic audio streaming for sending the continious streams to the Backend
 
