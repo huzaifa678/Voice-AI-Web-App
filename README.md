@@ -42,7 +42,7 @@
 
 * **Kubernetes** Used for orchestration of Infra pods and the application pods
 
-* **Helm** Used for packaging the application with resuable infra Helm Charts(Poatgres, RabbitMQ, Redis)
+* **Helm** Used for packaging the application with resuable infra Helm Charts(Postgres, RabbitMQ, Redis)
 
 ## Guidelines for starting with the web app
 
