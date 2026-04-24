@@ -8,7 +8,7 @@
 
 1. User registers -> User login -> DB store via postgres
 
-2. User speaks to the browser mic -> Websocket listens and process the audio -> sends to Silero VAD evaluating the probability
+2. User speaks to the browser mic -> Websocket listens and process the audio -> Sends to Silero VAD evaluating the probability
 
 3. Based on the threshold the audio buffer is passed to the gRPC servicer -> the servicer calls Whisper to Speech to Text Conversion -> The converted text is published to the RabbitMQ queue
 
@@ -22,13 +22,13 @@
 
 * **Django:** As the Backend Framework for defining the api endpoints for the REST server, configuring the REST server, Websocket server and the gRPC server for startup logic and graceful shutdown, setting variables for the RabbitMQ email worker to use and starting all three servers via the addition of uvicorn server
 
-* **Whisper AI:** As the AI model for converting audio to text
+* **Whisper AI:** As the STT model for converting audio speech to text
 
 * **Silero VAD:** As the AI model for speech detection based on the probability ensuring silence timeout and perfect speech detection
 
 * **XTTS v2 encoder** As the Encoder for converting text to speech
 
-* **Postgres:** Used as the DBMS for storing user credentials and token using the Django Database
+* **Postgres:** Used as the DBMS for storing user credentials and token using the Django user model and for storing voice chat sessions
 
 * **Pgbouncer**: Used for connection pooling for live connections 
 
