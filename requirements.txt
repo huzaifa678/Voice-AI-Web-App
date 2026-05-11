@@ -6,7 +6,7 @@ channels>=4.0
 channels-redis>=4.1
 torch==2.11.0 
 torchaudio==2.4.0 
-torchvision==0.19.0
+torchvision==0.26.0
 faster-whisper>=1.2.1
 silero-vad
 onnxruntime>=1.14,<2
