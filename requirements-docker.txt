@@ -8,7 +8,7 @@ torch==2.10.0+cpu
 torchvision==0.25.0+cpu
 torchaudio==2.10.0+cpu
 torchcodec==0.10.0
-faster-whisper>=1.2.0
+faster-whisper>=1.2.1
 silero-vad
 onnxruntime>=1.14,<2
 pydub>=0.25.1
