@@ -31,7 +31,7 @@ pytest-django==4.10.0
 pytest-asyncio==0.25.3
 flake8==7.3.0
 black==25.1.0
-autoflake==2.3.1
+autoflake==2.3.3
 TTS==0.22.0
 torchcodec
 celery
