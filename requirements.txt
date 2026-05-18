@@ -3,7 +3,7 @@ djangorestframework>=3.17.1
 djangorestframework-simplejwt
 rest_framework_simplejwt
 channels>=4.0
-channels-redis>=4.1
+channels-redis>=4.3.0
 torch==2.11.0 
 torchaudio==2.4.0 
 torchvision==0.26.0
