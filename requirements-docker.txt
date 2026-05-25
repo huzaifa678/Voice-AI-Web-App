@@ -24,7 +24,7 @@ soundfile==0.13.1
 django-cors-headers==4.9.0
 uvicorn[standard]==0.34.0
 scipy>=1.17.1
-aio_pika==9.5.5
+aio_pika==9.6.2
 grpcio
 grpcio-tools
 TTS==0.22.0
