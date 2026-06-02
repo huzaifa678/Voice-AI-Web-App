@@ -26,7 +26,7 @@ scipy>=1.17.1
 aio_pika==9.6.2
 grpcio
 grpcio-tools
-pytest==8.3.4
+pytest==9.0.3
 pytest-django==4.10.0
 pytest-asyncio==0.25.3
 flake8==7.3.0
