@@ -13,7 +13,7 @@ onnxruntime>=1.26.0,<2
 pydub>=0.25.1
 ffmpeg-python>=0.2.0
 python-dotenv>=1.2.2
-requests>=2.31.0
+requests>=2.34.2
 groq
 psycopg2-binary
 transformers==5.9.0
@@ -21,14 +21,14 @@ numpy==2.4.6
 pika
 soundfile==0.13.1
 django-cors-headers==4.9.0
-uvicorn[standard]==0.34.0
+uvicorn[standard]==0.48.0
 scipy>=1.17.1
 aio_pika==9.6.2
 grpcio
 grpcio-tools
-pytest==8.3.4
-pytest-django==4.12.0
-pytest-asyncio==0.25.3
+pytest==9.0.3
+pytest-django==4.10.0
+pytest-asyncio==1.4.0
 flake8==7.3.0
 black==26.5.1
 autoflake==2.3.3
