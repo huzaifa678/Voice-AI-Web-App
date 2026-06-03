@@ -13,7 +13,7 @@ onnxruntime>=1.26.0,<2
 pydub>=0.25.1
 ffmpeg-python>=0.2.0
 python-dotenv>=1.2.2
-requests>=2.31.0
+requests>=2.34.2
 groq
 psycopg2-binary
 transformers==5.9.0
