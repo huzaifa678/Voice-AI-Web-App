@@ -9,7 +9,7 @@ torchaudio==2.11.0
 torchvision==0.27.1
 faster-whisper>=1.2.1
 silero-vad
-onnxruntime>=1.26.0,<2
+onnxruntime>=1.27.0,<2
 pydub>=0.25.1
 ffmpeg-python>=0.2.0
 python-dotenv>=1.2.2
