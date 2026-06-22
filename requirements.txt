@@ -22,7 +22,7 @@ pika
 soundfile==0.14.0
 django-cors-headers==4.9.0
 uvicorn[standard]==0.49.0
-scipy>=1.17.1
+scipy>=1.18.0
 aio_pika==9.6.2
 grpcio
 grpcio-tools
