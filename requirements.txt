@@ -17,7 +17,7 @@ requests>=2.34.2
 groq
 psycopg2-binary
 transformers==5.12.1
-numpy==2.4.6
+numpy==2.5.0
 pika
 soundfile==0.14.0
 django-cors-headers==4.9.0
