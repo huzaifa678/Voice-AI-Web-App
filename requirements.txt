@@ -1,4 +1,4 @@
-Django>=6.0.6,<6.1
+Django>=6.0.7,<6.1
 djangorestframework>=3.17.1
 djangorestframework-simplejwt
 rest_framework_simplejwt
