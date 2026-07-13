@@ -17,7 +17,7 @@ python-dotenv>=1.2.2
 requests>=2.34.2
 groq
 psycopg2-binary
-transformers==5.13.0
+transformers==5.13.1
 numpy==2.5.1
 pika
 soundfile==0.14.0
