@@ -6,37 +6,40 @@ import aio_pika
 from app.audio.services import AudioService
 from app.llm.services import LLMService
 from app.common.rabbit_mq import get_connection, publish_audio_response
+from app.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
 
 async def handle_message(message: aio_pika.IncomingMessage):
-    print("RAW MESSAGE RECEIVED:", message.body)
+    logger.info("RAW MESSAGE RECEIVED: %s", message.body)
     payload = json.loads(message.body)
 
     try:
         audio_bytes = base64.b64decode(payload["audio_bytes"])
 
-        print("inside the handle message method")
+        logger.info("inside the handle message method")
 
         text = await asyncio.to_thread(AudioService.process_audio, audio_bytes)
 
         if text is None:
-            print("Speech-to-text returned None")
+            logger.info("Speech-to-text returned None")
             await message.ack()
             return
 
         text = text.strip()
 
         if text == "":
-            print("Speech-to-text returned empty string")
+            logger.info("Speech-to-text returned empty string")
             await message.ack()
             return
 
         response = await LLMService.query_from_text_async(text=text)
 
-        print("LLM response: ", response)
-        print("Length of TTS payload text:", len(response))
+        logger.info("LLM response: %s", response)
+        logger.info("Length of TTS payload text: %s", len(response))
 
         await publish_audio_response(user_id=payload.get("user_id"), response=response)
 
@@ -51,17 +54,17 @@ async def handle_message(message: aio_pika.IncomingMessage):
             content_type="application/json",
         )
 
-        print(
-            "Publishing TTS payload:",
+        logger.info(
+            "Publishing TTS payload: %s",
             json.dumps({"text": response, "user_id": payload.get("user_id")}),
         )
-        print("Publishing TTS message:", tts_message)
+        logger.info("Publishing TTS message: %s", tts_message)
 
         await channel.default_exchange.publish(
             tts_message,
             routing_key="tts_tasks",
         )
-        print("TTS task published")
+        logger.info("TTS task published")
 
         await channel.close()
 
@@ -80,8 +83,8 @@ async def main():
 
     await queue.consume(handle_message)
 
-    print("[*] Waiting for audio tasks")
-    print(" Press CTRL + C to exit")
+    logger.info("[*] Waiting for audio tasks")
+    logger.info(" Press CTRL + C to exit")
     await asyncio.Future()
 
 
