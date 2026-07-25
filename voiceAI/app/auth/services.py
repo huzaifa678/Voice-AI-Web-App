@@ -11,6 +11,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from app.common.jwt import generate_token
 from app.common.rate_limit import rate_limit
 from app.common.utils import parse_timedelta
+from app.common.logger import get_logger
 from app.models import RefreshToken
 
 load_dotenv()
@@ -18,6 +19,8 @@ load_dotenv()
 User = get_user_model()
 
 REFRESH_TOKEN_LIFETIME = parse_timedelta(os.getenv("REFRESH_TOKEN_LIFETIME", "7d"))
+
+logger = get_logger(__name__)
 
 
 class AuthService:
@@ -35,7 +38,7 @@ class AuthService:
     @staticmethod
     def login(ip: str, username: str, password: str):
 
-        print("lifetime", REFRESH_TOKEN_LIFETIME)
+        logger.info("lifetime: %s", REFRESH_TOKEN_LIFETIME)
 
         rate_limit(
             key=f"login:{ip}",

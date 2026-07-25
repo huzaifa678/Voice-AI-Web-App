@@ -7,7 +7,10 @@ from app.serializers.register_serializer import RegisterSerializer
 from app.serializers.login_serializer import LoginSerializer
 from app.serializers.refresh_serializer import RefreshSerializer
 from app.common.rabbit_mq import publish_email_task
+from app.common.logger import get_logger
 from .services import AuthService
+
+logger = get_logger(__name__)
 
 User = get_user_model()
 
@@ -38,7 +41,7 @@ class RegisterView(APIView):
                 )
             except ValueError as e:
                 return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        print(serializer.errors)
+        logger.warning("Serializer errors: %s", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -67,10 +70,10 @@ class RefreshView(APIView):
         serializer = RefreshSerializer(data=request.data)
         if serializer.is_valid():
             try:
-                print("serialized data", serializer.validated_data["refresh"])
+                logger.info("serialized data: %s", serializer.validated_data["refresh"])
                 token = AuthService.refresh(serializer.validated_data["refresh"])
                 return Response(token, status=status.HTTP_200_OK)
             except ValueError as e:
-                print(e)
+                logger.error("Refresh error: %s", e)
                 return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
