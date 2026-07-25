@@ -7,6 +7,9 @@ import numpy as np
 from pydub import AudioSegment
 from silero_vad import get_speech_timestamps, load_silero_vad
 from app.common.rabbit_mq import publish_audio_task
+from app.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
@@ -17,13 +20,13 @@ async def transcribe_audio_bytes(audio_bytes: bytes, user_id: str):
     if not audio_bytes:
         raise ValueError("Audio bytes required")
 
-    print("enter the service body2")
+    logger.debug("enter the service body2")
 
     wav_path = await asyncio.to_thread(
         AudioService.save_audio_to_wav, audio_bytes, format="webm"
     )
 
-    print("enter the service body3")
+    logger.debug("enter the service body3")
 
     try:
         import soundfile as sf
@@ -34,7 +37,7 @@ async def transcribe_audio_bytes(audio_bytes: bytes, user_id: str):
         if not VADService.is_speech(audio_pcm, sample_rate=sr):
             raise ValueError("No speech detected")
 
-        print("enter the service body4")
+        logger.debug("enter the service body4")
 
         loop = asyncio.get_running_loop()
         text = await loop.run_in_executor(
@@ -63,7 +66,7 @@ class AudioService:
     @classmethod
     def model(cls):
         if cls._model is None:
-            print("[AudioService] Loading Whisper model...")
+            logger.info("[AudioService] Loading Whisper model...")
             from faster_whisper import WhisperModel
 
             if ENVIRONMENT == "local":
@@ -72,7 +75,7 @@ class AudioService:
                 cls._model = WhisperModel(
                     cls.MODEL_PATH, device="cpu", compute_type="int8"
                 )
-                print("[AudioService] Whisper model loaded.")
+                logger.info("[AudioService] Whisper model loaded.")
         return cls._model
 
     @staticmethod
@@ -124,16 +127,16 @@ class AudioService:
 
         audio = np.frombuffer(audio_pcm, dtype=np.int16).astype(np.float32) / 32768.0
         if not VADService.is_speech(audio, sample_rate):
-            print("[AudioService] No speech detected by VAD")
+            logger.info("[AudioService] No speech detected by VAD")
             return None
 
         model = cls.model()
         loop = asyncio.get_running_loop()
 
         def run_transcription():
-            print("[AudioService] Whisper transcription started...")
+            logger.info("[AudioService] Whisper transcription started...")
             segments, _ = model.transcribe(audio)
-            print("[AudioService] Whisper transcription finished.")
+            logger.info("[AudioService] Whisper transcription finished.")
             return segments
 
         try:
@@ -141,10 +144,10 @@ class AudioService:
                 loop.run_in_executor(executor, run_transcription), timeout
             )
         except asyncio.TimeoutError:
-            print("[AudioService] Whisper transcription TIMEOUT")
+            logger.warning("[AudioService] Whisper transcription TIMEOUT")
             return None
         except Exception as e:
-            print(f"[AudioService] Whisper transcription ERROR: {e}")
+            logger.error("[AudioService] Whisper transcription ERROR: %s", e)
             return None
 
         transcript = " ".join(seg.text for seg in segments)
@@ -200,10 +203,10 @@ class VADService:
             sampling_rate=sample_rate,
         )
 
-        print("timestamps", timestamps)
+        logger.debug("timestamps: %s", timestamps)
 
         if not timestamps:
-            print("returning false")
+            logger.debug("returning false")
             return False
 
         duration_ms = sum(

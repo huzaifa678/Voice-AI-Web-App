@@ -6,6 +6,9 @@ import aio_pika
 import grpc
 import numpy as np
 from channels.generic.websocket import AsyncWebsocketConsumer
+from app.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 from app.audio.services import VADService
 from app.common.rate_limit import rate_limit
@@ -56,7 +59,7 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
 
         self.listen_task = asyncio.create_task(self.listen_llm_responses())
 
-        print(f"Connected user {self.user_id}")
+        logger.info("Connected user %s", self.user_id)
 
     async def receive(self, text_data=None, bytes_data=None):
         if not bytes_data:
@@ -285,7 +288,7 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
         try:
             while True:
                 msg = await self.log_queue.get()
-                print(msg)
+                logger.info(msg)
                 await asyncio.sleep(0.05)
                 self.log_queue.task_done()
         except asyncio.CancelledError:
@@ -296,7 +299,7 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
             await self.log_queue.put(msg)
 
     async def disconnect(self, code):
-        print(f"Disconnected {self.user_id}, code={code}")
+        logger.info("Disconnected %s, code=%s", self.user_id, code)
 
         if hasattr(self, "log_task"):
             self.log_task.cancel()
