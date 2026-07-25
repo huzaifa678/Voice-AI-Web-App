@@ -3,6 +3,9 @@ from django.contrib.auth.models import AnonymousUser
 from app.auth.services import AuthService
 from types import SimpleNamespace
 from channels.db import database_sync_to_async
+from app.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class JWTAuthMiddleware:
@@ -14,9 +17,9 @@ class JWTAuthMiddleware:
         qs = parse_qs(query_string)
         token = qs.get("token", [None])[0]
 
-        print(token)
-        print(qs)
-        print(query_string)
+        logger.debug("token: %s", token)
+        logger.debug("qs: %s", qs)
+        logger.debug("query_string: %s", query_string)
 
         scope["user"] = await self.get_user(token)
 
@@ -36,5 +39,5 @@ class JWTAuthMiddleware:
             user = SimpleNamespace(**user_data)
             return user
         except Exception as e:
-            print("Token verification failed:", e)
+            logger.warning("Token verification failed: %s", e)
             return AnonymousUser()
