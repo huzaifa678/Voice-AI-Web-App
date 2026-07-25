@@ -8,6 +8,9 @@ import soundfile as sf
 from TTS.api import TTS
 from TTS.tts.configs.xtts_config import XttsArgs, XttsAudioConfig, XttsConfig
 from TTS.config.shared_configs import BaseDatasetConfig
+from app.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 torch.set_num_threads(2)
 torch.set_num_interop_threads(1)
@@ -101,7 +104,7 @@ class TTSService:
                 if TTSService._tts_model is None:
                     TTSService._load_model_sync()
 
-        print("MODEL LOADED")
+        logger.info("MODEL LOADED")
 
         model = TTSService._tts_model.synthesizer.tts_model
 
@@ -137,5 +140,5 @@ class TTSService:
             buffer, wav_int16, samplerate=sample_rate, format="WAV", subtype="PCM_16"
         )
         buffer.seek(0)
-        print("SYNTHESIZE DONE")
+        logger.info("SYNTHESIZE DONE")
         return buffer.read()
