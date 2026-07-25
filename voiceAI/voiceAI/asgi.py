@@ -13,6 +13,9 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
 django.setup()
 
+from app.common.logger import get_logger
+logger = get_logger(__name__)
+
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 import grpc
@@ -36,14 +39,14 @@ class LifespanApp:
                 message = await receive()
 
                 if message["type"] == "lifespan.startup":
-                    print("ASGI startup")
+                    logger.info("ASGI startup")
 
                     await self.start_grpc_server()
 
                     await send({"type": "lifespan.startup.complete"})
 
                 elif message["type"] == "lifespan.shutdown":
-                    print("ASGI shutdown: cleaning up...")
+                    logger.info("ASGI shutdown: cleaning up...")
                     await self.shutdown()
                     await send({"type": "lifespan.shutdown.complete"})
                     return
@@ -60,13 +63,13 @@ class LifespanApp:
         self.grpc_server.add_insecure_port("[::]:50051")
 
         await self.grpc_server.start()
-        print("gRPC server started on port 50051")
+        logger.info("gRPC server started on port 50051")
 
     async def shutdown(self):
         from app.common.rabbit_mq import close_connection
 
         if self.grpc_server:
-            print("Stopping gRPC server...")
+            logger.info("Stopping gRPC server...")
             await self.grpc_server.stop(grace=None)
 
         close_connection()
