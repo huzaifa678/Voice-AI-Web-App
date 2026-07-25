@@ -1,9 +1,9 @@
 import os
 from dotenv import load_dotenv
 import httpx
-import logging
+from app.common.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 load_dotenv()
 
@@ -21,7 +21,7 @@ class LLMService:
         if not LLMService.API_KEY:
             raise RuntimeError("GROQ_API_KEY is not set")
 
-        print("TEXT", text)
+        logger.info("TEXT: %s", text)
 
         headers = {
             "Authorization": f"Bearer {LLMService.API_KEY}",
@@ -47,11 +47,11 @@ class LLMService:
                 logger.info("DATA: %s", data)
                 return data["choices"][0]["message"]["content"]
             except httpx.RequestError as e:
-                print("HTTPX Request failed:", e)
+                logger.error("HTTPX Request failed: %s", e)
             except httpx.HTTPStatusError as e:
-                print("HTTP status error:", e.response.status_code)
-                print("Response headers:", e.response.headers)
-                print("Response body:", e.response.text)
+                logger.error("HTTP status error: %s", e.response.status_code)
+                logger.error("Response headers: %s", e.response.headers)
+                logger.error("Response body: %s", e.response.text)
                 return f"HTTP Error {e.response.status_code}"
             except Exception as e:
-                print("Unexpected error:", e)
+                logger.error("Unexpected error: %s", e)
