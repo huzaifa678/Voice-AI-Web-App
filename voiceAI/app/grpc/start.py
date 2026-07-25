@@ -3,6 +3,9 @@ import django
 import asyncio
 import grpc
 from app.grpc import service_pb2_grpc
+from app.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
 django.setup()
@@ -15,7 +18,7 @@ async def serve():
     service_pb2_grpc.add_AudioServiceServicer_to_server(AudioServicer(), server)
     listen_addr = "[::]:50051"
     server.add_insecure_port(listen_addr)
-    print(f"gRPC server listening on {listen_addr}")
+    logger.info("gRPC server listening on %s", listen_addr)
     await server.start()
     await server.wait_for_termination()
 
