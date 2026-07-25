@@ -7,6 +7,10 @@ import pytest
 import httpx
 from websockets.asyncio.client import connect
 import soundfile as sf
+import logging
+from app.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 TARGET_SR = 16000
 INT16_MAX = 32767
@@ -56,9 +60,9 @@ async def test_audio_flow_e2e_smoke():
 
         assert resp.status_code == 200
         resp_json = resp.json()
-        print(resp_json)
+        logger.debug("resp_json: %s", resp_json)
         access_token = resp.json()["access"]["access"]
-        print(type(access_token))
+        logger.debug("access_token type: %s", type(access_token))
 
     base_ws = os.getenv("WS_URL", "ws://localhost:8000/ws/audio/")
     WS_URL = f"{base_ws}?token={quote(access_token)}"
@@ -102,11 +106,11 @@ async def test_audio_flow_e2e_smoke():
 
             if "transcript" in payload:
                 transcript_received = True
-                print("TRANSCRIPT:", payload["transcript"])
+                logger.info("TRANSCRIPT: %s", payload["transcript"])
 
             if "llmResponse" in payload:
                 llm_received = True
-                print("LLM:", payload["llmResponse"])
+                logger.info("LLM: %s", payload["llmResponse"])
 
             if transcript_received and llm_received:
                 break

@@ -8,6 +8,10 @@ import pytest
 import httpx
 from websockets.asyncio.client import connect
 import soundfile as sf
+import logging
+from app.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 TARGET_SR = 16000
 INT16_MAX = 32767
@@ -37,8 +41,8 @@ async def test_audio_flow_e2e_smoke():
     http_base = HTTP_BASE
     ws_base = WS_URL
 
-    print("HTTP_BASE =", http_base)
-    print("WS_URL =", ws_base)
+    logger.debug("HTTP_BASE = %s", http_base)
+    logger.debug("WS_URL = %s", ws_base)
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -63,9 +67,9 @@ async def test_audio_flow_e2e_smoke():
 
         assert resp.status_code == 200
         resp_json = resp.json()
-        print(resp_json)
+        logger.debug("resp_json: %s", resp_json)
         access_token = resp.json()["access"]["access"]
-        print(type(access_token))
+        logger.debug("access_token type: %s", type(access_token))
 
     ws_url = f"{ws_base}?token={quote(access_token)}"
 
@@ -110,16 +114,16 @@ async def test_audio_flow_e2e_smoke():
 
             if "transcript" in payload:
                 transcript_received = True
-                print("TRANSCRIPT:", payload["transcript"])
+                logger.info("TRANSCRIPT: %s", payload["transcript"])
 
             if "llmResponse" in payload:
                 llm_received = True
-                print("LLM:", payload["llmResponse"])
+                logger.info("LLM: %s", payload["llmResponse"])
 
             if "audioBase64" in payload and payload["audioBase64"] is not None:
                 tts_received = True
                 tts_audio_bytes = base64.b64decode(payload["audioBase64"])
-                print(f"TTS audio received: {len(tts_audio_bytes)} bytes")
+                logger.info("TTS audio received: %d bytes", len(tts_audio_bytes))
 
             if transcript_received and llm_received and tts_received:
                 break
