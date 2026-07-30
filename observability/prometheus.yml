@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: voice-ai-web
+    metrics_path: /metrics/
+    static_configs:
+      - targets:
+          - web:8000
+
+  - job_name: otel-collector
+    static_configs:
+      - targets:
+          - otel-collector:8888
+
+  - job_name: tempo
+    static_configs:
+      - targets:
+          - tempo:3201
+
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - prometheus:9090

@@ -1,0 +1,40 @@
+auth_enabled: false
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 4317
+  log_level: info
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  max_block_size: 5000000
+  complete_telemetry_interval: 5s
+  max_block_duration: 5m
+  flush_internal: 15s
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tmp/tempo/traces
+    pool:
+      max_worker_pool_size: 100
+      queue_channel_size: 1000
+
+query:
+  default_resultset_limit: 500
+  hide_query_schema: false
+  search:
+    advanced: true
+
+metrics:
+  prometheus:
+    endpoint: 0.0.0.0:3201

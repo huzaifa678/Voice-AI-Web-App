@@ -1,0 +1,92 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  filelog:
+    include: /var/log/app/*.log
+    start_at: beginning
+    fingerprint:
+      strategy: otelyq
+    operators:
+      - type: regex_parser
+        regex: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| (?P<level>\w+) \| (?P<logger>[^|]+) \| (?P<message>.*)$'
+        timestamp:
+          parse_from: time
+          layout: '%Y-%m-%d %H:%M:%S'
+        severity:
+          parse_from: level
+          text:
+            mappings:
+              error: ERROR
+              warn: WARN
+              info: INFO
+              debug: DEBUG
+
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          static_configs:
+            - targets: ['otel-collector:8888']
+        - job_name: 'voice-ai-web'
+          metrics_path: /metrics/
+          static_configs:
+            - targets: ['web:8000']
+
+processors:
+  batch:
+    send_batch_size: 1000
+    timeout: 5s
+    send_batch_max_size: 2000
+
+  attributes:
+    actions:
+      - key: service.name
+        value: voice-ai-backend
+        action: upsert
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  loki:
+    endpoint: loki:3100
+    tls:
+      insecure: true
+    labels:
+      job: voice-ai-backend
+    header:
+      X-Scope-OrgID: voice-ai
+
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, attributes]
+      exporters: [otlp/tempo]
+
+    logs:
+      receivers: [filelog]
+      processors: [batch, attributes]
+      exporters: [loki]
+
+    metrics:
+      receivers: [prometheus]
+      processors: [batch]
+      exporters: [prometheusremotewrite]
+
+  telemetry:
+    logs:
+      level: "info"
+    metrics:
+      level: "detailed"
+      address: "0.0.0.0:8888"
