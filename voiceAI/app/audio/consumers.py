@@ -2,18 +2,30 @@ import asyncio
 import os
 import time
 import json
-import aio_pika
 import grpc
 import numpy as np
+import aio_pika
+from collections import deque
 from channels.generic.websocket import AsyncWebsocketConsumer
-from app.common.logger import get_logger
-
-logger = get_logger(__name__)
 
 from app.audio.services import VADService
+from app.common.logger import get_logger
 from app.common.rate_limit import rate_limit
 from app.common.rabbit_mq import get_connection
 from app.grpc import audio_pb2, service_pb2_grpc
+from app.audio.metrics import VoiceMetrics
+from app.audio.session import VoiceSession
+from app.audio.state import VoiceState
+from app.common.telemetry import (
+    SpanKind,
+    context_from_metadata,
+    current_trace_headers,
+    record_exception,
+    tracer,
+)
+
+logger = get_logger(__name__)
+tracer = tracer(__name__)
 
 TARGET_SR = 16000
 
@@ -32,6 +44,27 @@ INT16_MAX = 32767
 
 class AudioStreamConsumer(AsyncWebsocketConsumer):
 
+    async def emit_event(
+        self,
+        event: VoiceState,
+        metadata=None
+    ):
+
+        payload = {
+            "event": event.value,
+            "user_id": self.user_id,
+            "timestamp": VoiceMetrics.now()
+        }
+
+        if metadata:
+            payload.update(metadata)
+
+        VoiceMetrics.count_event(event.value)
+
+        await self.log(
+            f"[VOICE_EVENT] {payload}"
+        )
+
     async def connect(self):
         ip = self.scope["client"][0]
         self.user_id = getattr(self.scope.get("user"), "id", None)
@@ -42,216 +75,344 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
 
         rate_limit(key=f"ws:{ip}", limit=30, window_seconds=60)
 
-        self.vad_frame_buffer = np.array([], dtype=np.float32)
-        self.audio_buffer = b""
-        self.prob_history = []
+        self.session = VoiceSession(
+            user_id=str(self.user_id)
+        )
 
-        self.in_speech = False
-        self.speech_ms = 0.0
-        self.last_speech_ts = None
+        self.session.is_playing_audio = False
 
-        self.warmup_frames = 5
+        self.session.current_tts_task = None
+
+        self.session.state = (
+            VoiceState.LISTENING
+        )
+
+        self.session.metrics.session_started = (
+            VoiceMetrics.now()
+        )
 
         await self.accept()
 
         self.log_queue = asyncio.Queue()
-        self.log_task = asyncio.create_task(self._log_worker())
 
-        self.listen_task = asyncio.create_task(self.listen_llm_responses())
+        self.log_task = asyncio.create_task(
+            self._log_worker()
+        )
+
+        self.listen_task = asyncio.create_task(
+            self.listen_llm_responses()
+        )
+
+        # Persistent gRPC channel created once per WebSocket connection.
+        # Reused for every transcription request to avoid per-utterance
+        # TCP + HTTP/2 handshake overhead.
+        self._grpc_target = os.getenv(
+            "GRPC_DEPLOYMENT_TYPE", "local"
+        ).lower()
+        if self._grpc_target == "remote":
+            self._grpc_host = "voice-ai-grpc:50051"
+        else:
+            self._grpc_host = "localhost:50051"
+
+        self.grpc_channel = grpc.aio.insecure_channel(self._grpc_host)
+        self.grpc_stub = service_pb2_grpc.AudioServiceStub(self.grpc_channel)
+
+        # Use deque for O(1) append/pop instead of repeated np.concatenate
+        # which creates new arrays on every frame and causes O(n^2) GC pressure.
+        self.vad_frame_buffer = deque()
+
+        # bytearray grows efficiently without repeated bytes concatenation
+        self.session.audio_buffer = bytearray()
+
+        self.warmup_frames = 5
 
         logger.info("Connected user %s", self.user_id)
 
     async def receive(self, text_data=None, bytes_data=None):
-        if not bytes_data:
+        if text_data:
+
+            data = json.loads(text_data)
+
+            if data.get("event") == "audio_finished":
+                self.session.is_playing_audio = False
+                self.session.set_state(VoiceState.LISTENING)
+                await self.emit_event(VoiceState.LISTENING)
+                await self.log("[VOICE] Playback finished, returning to LISTENING")
+
             return
 
         audio = np.frombuffer(bytes_data, dtype=np.int16).astype(np.float32)
         audio /= INT16_MAX
 
-        self.vad_frame_buffer = np.concatenate([self.vad_frame_buffer, audio])
+        # O(1) append to deque instead of np.concatenate
+        self.vad_frame_buffer.extend(audio.tolist())
 
         smooth_frame_count = max(
             1, int(SMOOTH_WINDOW_MS / (FRAME_SAMPLES / TARGET_SR * 1000))
         )
 
         while len(self.vad_frame_buffer) >= FRAME_SAMPLES:
-            frame = self.vad_frame_buffer[:FRAME_SAMPLES]
-            self.vad_frame_buffer = self.vad_frame_buffer[FRAME_SAMPLES:]
+            frame_float = np.array(
+                list(self.vad_frame_buffer)[:FRAME_SAMPLES], dtype=np.float32
+            )
+            # consume exactly FRAME_SAMPLES from the left
+            for _ in range(FRAME_SAMPLES):
+                self.vad_frame_buffer.popleft()
 
             if self.warmup_frames > 0:
                 self.warmup_frames -= 1
                 continue
 
             now = time.monotonic()
-            rms = np.sqrt(np.mean(frame**2))
+            rms = np.sqrt(np.mean(frame_float**2))
 
             if rms < RMS_GATE:
                 prob = 0.0
             else:
-                prob = float(VADService.speech_prob(frame, sample_rate=TARGET_SR))
+                prob = float(VADService.speech_prob(frame_float, sample_rate=TARGET_SR))
 
-            self.prob_history.append(prob)
-            if len(self.prob_history) > smooth_frame_count:
-                self.prob_history.pop(0)
+            self.session.prob_history.append(prob)
+            if len(self.session.prob_history) > smooth_frame_count:
+                self.session.prob_history.pop(0)
 
             smooth_prob = (
-                prob if not self.in_speech else float(np.mean(self.prob_history))
+                prob if not self.session.in_speech else float(np.mean(self.session.prob_history))
             )
 
             await self.log(
                 f"[VAD] rms={rms:.4f} "
                 f"prob={prob:.3f} "
                 f"smooth={smooth_prob:.3f} "
-                f"in_speech={self.in_speech}"
+                f"in_speech={self.session.in_speech}"
             )
 
-            if not self.in_speech and smooth_prob > SPEECH_START_PROB:
-                await self.log("[VAD] SPEECH START")
-                self.in_speech = True
-                self.last_speech_ts = now
-                self.audio_buffer = b""
-                self.prob_history.clear()
+            if not self.session.in_speech and smooth_prob > SPEECH_START_PROB:
 
-            if self.in_speech:
-                self.audio_buffer += (frame * INT16_MAX).astype(np.int16).tobytes()
+                await self.log("[VAD] SPEECH START")
+
+                if self.session.state == VoiceState.SPEAKING:
+                    await self.log(
+                        "[BARGE-IN] User interrupted TTS"
+                    )
+
+                    self.session.interrupt()
+
+                    await self.emit_event(
+                        VoiceState.INTERRUPTED
+                    )
+
+                    await self.send(
+                        text_data=json.dumps(
+                            {
+                                "event": "stop_audio"
+                            }
+                        )
+                    )
+
+                self.session.in_speech = True
+                self.session.state = VoiceState.SPEECH_STARTED
+                started = VoiceMetrics.now()
+                self.session.metrics.session_started = started
+                self.session.metrics.vad_started = started
+
+                self.session.last_speech_ts = now
+
+                await self.emit_event(VoiceState.SPEECH_STARTED)
+
+                # audio collection for transcription
+                self.session.state = VoiceState.TRANSCRIBING
+
+            if self.session.in_speech:
+                # Efficient bytes accumulation with bytearray
+                self.session.audio_buffer.extend(
+                    (frame_float * INT16_MAX).astype(np.int16).tobytes()
+                )
 
                 if smooth_prob > SPEECH_END_PROB:
-                    self.last_speech_ts = now
+                    self.session.last_speech_ts = now
 
-                elif (now - self.last_speech_ts) > SILENCE_TIMEOUT:
+                elif (now - self.session.last_speech_ts) > SILENCE_TIMEOUT:
                     await self.log("[VAD] SPEECH END")
+                    self.session.metrics.vad_finished = (
+                        VoiceMetrics.now()
+                    )
+                    self.session.metrics.observe_vad()
+
+                    await self.emit_event(
+                        VoiceState.TRANSCRIBING
+                    )
+
                     await self.process_buffer()
 
-                    self.in_speech = False
-                    self.audio_buffer = b""
-                    self.last_speech_ts = None
-                    self.prob_history.clear()
+                    self.session.in_speech = False
+                    self.session.audio_buffer = bytearray()
+                    self.session.last_speech_ts = None
+                    self.session.prob_history.clear()
                     self.warmup_frames = 3
 
     async def process_buffer(self):
         await self.log("enter the process buffer method")
         min_bytes = int(TARGET_SR * 2 * 0.5)  # 0.5 sec PCM16
-        if len(self.audio_buffer) < min_bytes:
+        if len(self.session.audio_buffer) < min_bytes:
             await self.log("[VAD] Dropped short utterance")
             return
 
-        try:
-            grpc_type = os.getenv("GRPC_DEPLOYMENT_TYPE", "local").lower()
-            if grpc_type == "remote":
-                await self.log("[gRPC] Using separate deployment method")
-                response = await self.send_to_grpc_separate(self.audio_buffer)
-            else:
-                await self.log("[gRPC] Using local deployment method")
-                response = await self.send_to_grpc(self.audio_buffer)
+        audio_bytes = bytes(self.session.audio_buffer)
+        VoiceMetrics.observe_audio_bytes(len(audio_bytes))
 
-            await self.send(text_data=json.dumps(response))
-            await self.log("called the grpc method successfully")
+        with tracer.start_as_current_span(
+            "voice.websocket.utterance",
+            kind=SpanKind.SERVER,
+            attributes={
+                "voice.user_id": str(self.user_id),
+                "voice.audio_bytes": len(audio_bytes),
+            },
+        ) as span:
+            try:
+                grpc_type = os.getenv("GRPC_DEPLOYMENT_TYPE", "local").lower()
+                self.session.state = (VoiceState.TRANSCRIBING)
+                self.session.metrics.stt_started = (VoiceMetrics.now())
+                if grpc_type == "remote":
+                    await self.log("[gRPC] Using persistent channel (remote)")
+                    response = await self.send_to_grpc_separate(audio_bytes)
+                else:
+                    await self.log("[gRPC] Using persistent channel (local)")
+                    response = await self.send_to_grpc(audio_bytes)
 
-        except Exception as e:
-            await self.send(text_data=json.dumps({"error": str(e)}))
+                self.session.metrics.stt_finished = (VoiceMetrics.now())
+                self.session.metrics.observe_stt()
+                self.session.state = (VoiceState.THINKING)
 
-        # try:
-        #     await self.log("entered the service body")
-        #     result = await transcribe_audio_bytes(
-        #         self.audio_buffer,
-        #         user_id=str(self.user_id),
-        #     )
-        #     await self.send(text_data=json.dumps(result))
-        # except Exception as e:
-        #     await self.send(text_data=json.dumps({"error": str(e)}))
+                transcript = response.get("transcript")
+                span.set_attribute("voice.transcript_chars", len(transcript or ""))
+
+                await self.emit_event(VoiceState.THINKING, {"transcript": transcript})
+
+                self.session.metrics.websocket_sent = VoiceMetrics.now()
+                self.session.metrics.observe("stt_roundtrip", self.session.metrics.session_started, self.session.metrics.websocket_sent)
+                await self.send(text_data=json.dumps(response))
+                await self.log("called the grpc method successfully")
+
+            except Exception as e:
+                VoiceMetrics.count_error("websocket_process_buffer")
+                record_exception(span, e)
+                await self.send(text_data=json.dumps({"error": str(e)}))
 
     async def send_to_grpc_separate(self, audio_bytes: bytes):
         """
-        Connect to gRPC when it's running as a separate Deployment/service in K8s.
-        Uses the service DNS name instead of localhost.
+        Stream audio to gRPC using the persistent channel created in connect().
         """
         user_id = str(self.user_id) if self.user_id else "anonymous"
-        grpc_target = (
-            "voice-ai-grpc:50051"  # Kubernetes service name of the gRPC deployment
-        )
-        await self.log(f"[gRPC] Connecting to separate gRPC service at {grpc_target}")
+        await self.log(f"[gRPC] Using persistent channel to {self._grpc_host}")
 
-        async with grpc.aio.insecure_channel(grpc_target) as channel:
-            stub = service_pb2_grpc.AudioServiceStub(channel)
-            await self.log("[gRPC] Created stub for separate deployment")
+        async def gen_chunks():
+            chunk_size = 16000
+            for i in range(0, len(audio_bytes), chunk_size * 2):
+                chunk = audio_bytes[i : i + chunk_size * 2]
+                if not chunk:
+                    break
+                yield audio_pb2.AudioChunk(pcm=chunk)
+                await asyncio.sleep(0)  # yield control to event loop
 
-            async def gen_chunks():
-                chunk_size = 16000
-                for i in range(0, len(audio_bytes), chunk_size * 2):
-                    chunk = audio_bytes[i : i + chunk_size * 2]
-                    if not chunk:
-                        break
-                    yield audio_pb2.AudioChunk(pcm=chunk)
-                    await asyncio.sleep(0)  # yield control to event loop
-
-            try:
-                response = await asyncio.wait_for(
-                    stub.StreamTranscribe(
-                        gen_chunks(), metadata=(("user_id", user_id),)
-                    ),
-                    timeout=30.0,
-                )
+        async def consume_stream():
+            with tracer.start_as_current_span(
+                "voice.grpc.client_stream_transcribe",
+                kind=SpanKind.CLIENT,
+                attributes={
+                    "rpc.system": "grpc",
+                    "rpc.service": "AudioService",
+                    "rpc.method": "StreamTranscribe",
+                    "net.peer.name": self._grpc_host,
+                    "voice.audio_bytes": len(audio_bytes),
+                },
+            ) as span:
+                transcript_parts = []
+                metadata = tuple(current_trace_headers().items()) + (("user_id", user_id),)
+                async for response in self.grpc_stub.StreamTranscribe(
+                    gen_chunks(), metadata=metadata
+                ):
+                    if response.transcript:
+                        transcript_parts.append(response.transcript)
+                transcript = " ".join(transcript_parts)
+                span.set_attribute("voice.transcript_chars", len(transcript))
                 await self.log(
                     "[gRPC] Method invoked successfully on separate deployment"
                 )
-                return {"transcript": response.transcript}
+                return {"transcript": transcript}
 
-            except asyncio.CancelledError:
-                await self.log("[gRPC] Call cancelled due to disconnect")
-                return {"error": "gRPC call cancelled"}
+        try:
+            return await asyncio.wait_for(consume_stream(), timeout=30.0)
 
-            except asyncio.TimeoutError:
-                await self.log("[gRPC] Call timed out")
-                return {"error": "gRPC call timed out"}
+        except asyncio.CancelledError:
+            await self.log("[gRPC] Call cancelled due to disconnect")
+            return {"error": "gRPC call cancelled"}
 
-            except grpc.aio.AioRpcError as e:
-                await self.log(f"[gRPC ERROR] {e.code()}: {e.details()}")
-                return {"error": f"gRPC call failed: {e.details()}"}
+        except asyncio.TimeoutError:
+            await self.log("[gRPC] Call timed out")
+            return {"error": "gRPC call timed out"}
+
+        except grpc.aio.AioRpcError as e:
+            await self.log(f"[gRPC ERROR] {e.code()}: {e.details()}")
+            return {"error": f"gRPC call failed: {e.details()}"}
 
     async def send_to_grpc(self, audio_bytes: bytes):
         """
-        Stream audio in small chunks to the gRPC AudioService and get transcription.
+        Stream audio in small chunks to the gRPC AudioService using the
+        persistent channel created in connect().
         """
         user_id = str(self.user_id) if self.user_id else "anonymous"
         await self.log("entered the grpc method")
 
-        async with grpc.aio.insecure_channel("localhost:50051") as channel:
-            stub = service_pb2_grpc.AudioServiceStub(channel)
-            await self.log("created stub")
+        async def gen_chunks():
+            """
+            Split audio_bytes into small PCM16 chunks and yield them.
+            """
+            chunk_size = 16000
+            for i in range(0, len(audio_bytes), chunk_size * 2):
+                chunk = audio_bytes[i : i + chunk_size * 2]
+                if not chunk:
+                    break
+                yield audio_pb2.AudioChunk(pcm=chunk)
+                await asyncio.sleep(0)
 
-            async def gen_chunks():
-                """
-                Split audio_bytes into small PCM16 chunks and yield them.
-                """
-                chunk_size = 16000
-                for i in range(0, len(audio_bytes), chunk_size * 2):
-                    chunk = audio_bytes[i : i + chunk_size * 2]
-                    if not chunk:
-                        break
-                    yield audio_pb2.AudioChunk(pcm=chunk)
-                    await asyncio.sleep(0)
-
-            try:
-                response = await asyncio.wait_for(
-                    stub.StreamTranscribe(
-                        gen_chunks(), metadata=(("user_id", user_id),)
-                    ),
-                    timeout=30.0,
-                )
+        async def consume_stream():
+            with tracer.start_as_current_span(
+                "voice.grpc.client_stream_transcribe",
+                kind=SpanKind.CLIENT,
+                attributes={
+                    "rpc.system": "grpc",
+                    "rpc.service": "AudioService",
+                    "rpc.method": "StreamTranscribe",
+                    "net.peer.name": self._grpc_host,
+                    "voice.audio_bytes": len(audio_bytes),
+                },
+            ) as span:
+                transcript_parts = []
+                metadata = tuple(current_trace_headers().items()) + (("user_id", user_id),)
+                async for response in self.grpc_stub.StreamTranscribe(
+                    gen_chunks(), metadata=metadata
+                ):
+                    if response.transcript:
+                        transcript_parts.append(response.transcript)
+                transcript = " ".join(transcript_parts)
+                span.set_attribute("voice.transcript_chars", len(transcript))
                 await self.log("method invoked successfully")
-                return {"transcript": response.transcript}
+                return {"transcript": transcript}
 
-            except asyncio.CancelledError:
-                await self.log("[gRPC] Call cancelled due to disconnect")
-                return {"error": "gRPC call cancelled"}
+        try:
+            return await asyncio.wait_for(consume_stream(), timeout=30.0)
 
-            except asyncio.TimeoutError:
-                await self.log("[gRPC] Call timed out")
-                return {"error": "gRPC call timed out"}
+        except asyncio.CancelledError:
+            await self.log("[gRPC] Call cancelled due to disconnect")
+            return {"error": "gRPC call cancelled"}
 
-            except grpc.aio.AioRpcError as e:
-                await self.log(f"[gRPC ERROR] {e.code()}: {e.details()}")
-                return {"error": f"gRPC call failed: {e.details()}"}
+        except asyncio.TimeoutError:
+            await self.log("[gRPC] Call timed out")
+            return {"error": "gRPC call timed out"}
+
+        except grpc.aio.AioRpcError as e:
+            await self.log(f"[gRPC ERROR] {e.code()}: {e.details()}")
+            return {"error": f"gRPC call failed: {e.details()}"}
 
     async def listen_llm_responses(self):
         connection = await get_connection()
@@ -272,17 +433,38 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
             async for message in it:
                 async with message.process():
                     data = json.loads(message.body)
-                    await self.log(f"sending the message {data}")
-                    if str(data.get("user_id")) == str(self.user_id):
-                        await self.log(f"sending the message {data}")
-                        await self.send(
-                            text_data=json.dumps(
-                                {
-                                    "llmResponse": data.get("response"),
-                                    "audioBase64": data.get("audio_bytes"),
-                                }
-                            )
-                        )
+                    parent_context = context_from_metadata(data.get("trace", {}).items())
+                    with tracer.start_as_current_span(
+                        "voice.websocket.deliver_response",
+                        context=parent_context,
+                        kind=SpanKind.SERVER,
+                        attributes={
+                            "voice.user_id": str(self.user_id),
+                            "voice.response_chars": len(data.get("response") or ""),
+                            "voice.tts.audio_base64_chars": len(data.get("audio_bytes") or ""),
+                        },
+                    ) as span:
+                        try:
+                            await self.log(f"sending the message {data}")
+                            if str(data.get("user_id")) == str(self.user_id):
+                                await self.log(f"sending the message {data}")
+                                self.session.state = (VoiceState.SPEAKING)
+
+                                await self.emit_event(VoiceState.SPEAKING)
+                                await self.send(
+                                    text_data=json.dumps(
+                                        {
+                                            "llmResponse": data.get("response"),
+                                            "audioBase64": data.get("audio_bytes"),
+                                        }
+                                    )
+                                )
+                                if data.get("audio_bytes"):
+                                    self.session.metrics.websocket_sent = VoiceMetrics.now()
+                                    self.session.metrics.observe_total()
+                        except Exception as exc:
+                            record_exception(span, exc)
+                            raise
 
     async def _log_worker(self):
         try:
@@ -307,13 +489,19 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
         if hasattr(self, "listen_task"):
             self.listen_task.cancel()
 
-        self.vad_frame_buffer = np.array([], dtype=np.float32)
-        self.audio_buffer = b""
-        self.in_speech = False
-        self.prob_history.clear()
+        # Close persistent gRPC channel gracefully
+        if hasattr(self, "grpc_channel") and self.grpc_channel is not None:
+            await self.grpc_channel.close()
+            self.grpc_channel = None
+            self.grpc_stub = None
+
+        self.vad_frame_buffer = deque()
+        self.session.audio_buffer = bytearray()
+        self.session.in_speech = False
+        self.session.prob_history.clear()
 
     async def cleanup(self):
-        self.audio_buffer = b""
-        self.vad_frame_buffer = np.array([], dtype=np.float32)
-        self.in_speech = False
-        self.last_speech_ts = None
+        self.session.audio_buffer = bytearray()
+        self.vad_frame_buffer = deque()
+        self.session.in_speech = False
+        self.session.last_speech_ts = None
