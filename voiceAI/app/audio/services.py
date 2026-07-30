@@ -8,8 +8,11 @@ from pydub import AudioSegment
 from silero_vad import get_speech_timestamps, load_silero_vad
 from app.common.rabbit_mq import publish_audio_task
 from app.common.logger import get_logger
+from app.common.telemetry import record_exception, tracer
+from app.audio.simul_whisper_service import SimulWhisperService
 
 logger = get_logger(__name__)
+tracer = tracer(__name__)
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
@@ -20,153 +23,248 @@ async def transcribe_audio_bytes(audio_bytes: bytes, user_id: str):
     if not audio_bytes:
         raise ValueError("Audio bytes required")
 
-    logger.debug("enter the service body2")
+    with tracer.start_as_current_span(
+        "voice.audio.transcribe_upload",
+        attributes={
+            "voice.user_id": str(user_id),
+            "voice.audio_bytes": len(audio_bytes),
+        },
+    ) as span:
+        try:
+            logger.debug("enter the service body2")
 
-    wav_path = await asyncio.to_thread(
-        AudioService.save_audio_to_wav, audio_bytes, format="webm"
-    )
+            with tracer.start_as_current_span("voice.audio.convert_to_wav"):
+                wav_path = await asyncio.to_thread(
+                    AudioService.save_audio_to_wav, audio_bytes, format="webm"
+                )
 
-    logger.debug("enter the service body3")
+            logger.debug("enter the service body3")
 
-    try:
-        import soundfile as sf
+            try:
+                import soundfile as sf
 
-        audio_pcm, sr = sf.read(wav_path, dtype="int16")
-        audio_bytes_pcm = audio_pcm.tobytes()
+                audio_pcm, sr = sf.read(wav_path, dtype="int16")
+                audio_bytes_pcm = audio_pcm.tobytes()
+                span.set_attribute("voice.sample_rate", sr)
+                span.set_attribute("voice.pcm_bytes", len(audio_bytes_pcm))
 
-        if not VADService.is_speech(audio_pcm, sample_rate=sr):
-            raise ValueError("No speech detected")
+                with tracer.start_as_current_span("voice.vad.verify_speech"):
+                    if not VADService.is_speech(audio_pcm, sample_rate=sr):
+                        raise ValueError("No speech detected")
 
-        logger.debug("enter the service body4")
+                logger.debug("enter the service body4")
 
-        loop = asyncio.get_running_loop()
-        text = await loop.run_in_executor(
-            executor, AudioService.transcribe_pcm, audio_bytes_pcm, sr
-        )
+                text = await AudioService.transcribe_pcm(audio_bytes_pcm, sr)
+                span.set_attribute("voice.transcript_chars", len(text or ""))
 
-        if not text.strip():
-            raise ValueError("Empty transcription")
+                if not text.strip():
+                    raise ValueError("Empty transcription")
 
-        publish_audio_task(
-            user_id=user_id,
-            audio_bytes=audio_bytes,
-        )
+                await publish_audio_task(
+                    user_id=user_id,
+                    audio_bytes=audio_bytes,
+                )
 
-        return {"transcript": text}
+                return {"transcript": text}
 
-    finally:
-        if os.path.exists(wav_path):
-            os.remove(wav_path)
+            finally:
+                if os.path.exists(wav_path):
+                    os.remove(wav_path)
+        except Exception as exc:
+            record_exception(span, exc)
+            raise
 
 
 class AudioService:
-    _model = None
-    MODEL_PATH = "/app/models/base"
-
-    @classmethod
-    def model(cls):
-        if cls._model is None:
-            logger.info("[AudioService] Loading Whisper model...")
-            from faster_whisper import WhisperModel
-
-            if ENVIRONMENT == "local":
-                cls._model = WhisperModel("base", device="cpu", compute_type="int8")
-            else:
-                cls._model = WhisperModel(
-                    cls.MODEL_PATH, device="cpu", compute_type="int8"
-                )
-                logger.info("[AudioService] Whisper model loaded.")
-        return cls._model
 
     @staticmethod
-    def save_audio_to_wav(audio_bytes: bytes, format: str = "webm") -> str:
+    def save_audio_to_wav(
+        audio_bytes: bytes,
+        format: str = "webm"
+    ) -> str:
+
         """
-        Converts raw audio bytes to a temporary WAV file
+        Converts audio bytes into 16khz mono wav.
         """
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            audio = AudioSegment.from_file(io.BytesIO(audio_bytes), format=format)
-            audio = audio.set_channels(1).set_frame_rate(16000)
-            audio.export(tmp.name, format="wav")
+
+        with tempfile.NamedTemporaryFile(
+            suffix=".wav",
+            delete=False
+        ) as tmp:
+
+
+            audio = AudioSegment.from_file(
+                io.BytesIO(audio_bytes),
+                format=format
+            )
+
+
+            audio = (
+                audio
+                .set_channels(1)
+                .set_frame_rate(16000)
+            )
+
+
+            audio.export(
+                tmp.name,
+                format="wav"
+            )
+
+
             return tmp.name
 
     @classmethod
-    def transcribe(cls, wav_path: str) -> str:
-        model = cls.model()
-        segments, _ = model.transcribe(wav_path)
-        return " ".join(seg.text for seg in segments)
+    def transcribe(
+        cls,
+        wav_path: str
+    ):
 
-    # @classmethod
-    # def transcribe_pcm(cls, audio_pcm: bytes, sample_rate: int = 16000):
-    #     audio = (
-    #         np.frombuffer(audio_pcm, dtype=np.int16)
-    #         .astype(np.float32) / 32768.0
-    #     )
-    #     if not VADService.is_speech(audio, sample_rate):
-    #         return None
+        import soundfile as sf
 
-    #     model = cls.model()
-    #     segments, _ = model.transcribe(audio)
-    #     return " ".join(seg.text for seg in segments)
+        audio, sr = sf.read(
+            wav_path,
+            dtype="float32"
+        )
+
+        audio = np.asarray(
+            audio
+        )
+
+        return cls.transcribe_numpy(
+            audio,
+            sr
+        )
+
+    @classmethod
+    def transcribe_numpy(
+        cls,
+        audio: np.ndarray,
+        sample_rate: int = 16000
+    ):
+
+        """
+        Sends numpy audio chunk to SimulStreaming.
+        """
+
+        with tracer.start_as_current_span(
+            "voice.stt.transcribe_numpy",
+            attributes={
+                "voice.sample_rate": sample_rate,
+                "voice.audio_samples": len(audio),
+            },
+        ):
+            transcript = (
+                SimulWhisperService.transcribe_chunk(
+                    audio
+                )
+            )
+
+        if not transcript:
+            return ""
+        
+        return transcript
+
+
 
     @classmethod
     async def transcribe_pcm(
-        cls, audio_pcm: bytes, sample_rate: int = 16000, timeout: float = 30.0
+        cls,
+        audio_pcm: bytes,
+        sample_rate: int = 16000,
+        timeout: float = 30.0
     ):
+
         """
-        Kubernetes async/executor version
+        gRPC streaming entrypoint.
+
+        Receives PCM16 chunks,
+        converts to float32,
+        sends to SimulStreaming.
         """
-        if ENVIRONMENT == "local":
-            audio = (
-                np.frombuffer(audio_pcm, dtype=np.int16).astype(np.float32) / 32768.0
+
+
+        audio = (
+            np.frombuffer(
+                audio_pcm,
+                dtype=np.int16
             )
-            if not VADService.is_speech(audio, sample_rate):
-                return None
-            model = cls.model()
-            segments, _ = model.transcribe(audio)
-            return " ".join(seg.text for seg in segments)
+            .astype(np.float32)
+            /
+            32768.0
+        )
 
-        audio = np.frombuffer(audio_pcm, dtype=np.int16).astype(np.float32) / 32768.0
-        if not VADService.is_speech(audio, sample_rate):
-            logger.info("[AudioService] No speech detected by VAD")
-            return None
 
-        model = cls.model()
         loop = asyncio.get_running_loop()
 
-        def run_transcription():
-            logger.info("[AudioService] Whisper transcription started...")
-            segments, _ = model.transcribe(audio)
-            logger.info("[AudioService] Whisper transcription finished.")
-            return segments
 
         try:
-            segments = await asyncio.wait_for(
-                loop.run_in_executor(executor, run_transcription), timeout
-            )
-        except asyncio.TimeoutError:
-            logger.warning("[AudioService] Whisper transcription TIMEOUT")
-            return None
-        except Exception as e:
-            logger.error("[AudioService] Whisper transcription ERROR: %s", e)
-            return None
 
-        transcript = " ".join(seg.text for seg in segments)
-        return transcript
+            with tracer.start_as_current_span(
+                "voice.stt.transcribe_pcm",
+                attributes={
+                    "voice.sample_rate": sample_rate,
+                    "voice.pcm_bytes": len(audio_pcm),
+                    "voice.timeout_seconds": timeout,
+                },
+            ) as span:
+                transcript = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        cls.transcribe_numpy,
+                        audio,
+                        sample_rate
+                    ),
+                    timeout
+                )
+                span.set_attribute("voice.transcript_chars", len(transcript or ""))
+
+            return transcript
+
+        except asyncio.TimeoutError:
+
+            logger.warning(
+                "[AudioService] SimulStreaming timeout"
+            )
+
+            return ""
+
+        except Exception as e:
+
+            logger.exception(
+                "[AudioService] SimulStreaming failed: %s",
+                e
+            )
+
+            return ""
+
+
 
     @staticmethod
-    def verify_phrase(text: str, expected: str) -> bool:
-        return expected.lower() in text.lower()
+    def verify_phrase(
+        text: str,
+        expected: str
+    ) -> bool:
+
+        return (
+            expected.lower()
+            in
+            text.lower()
+        )
+
+
 
     @classmethod
-    def process_audio(cls, audio_pcm: bytes, sample_rate: int = 16000):
-        audio = np.frombuffer(audio_pcm, dtype=np.int16).astype(np.float32) / 32768.0
+    async def process_audio(
+        cls,
+        audio_pcm: bytes,
+        sample_rate: int = 16000
+    ):
 
-        if not VADService.is_speech(audio, sample_rate):
-            return None
-
-        model = cls.model()
-        segments, _ = model.transcribe(audio)
-        return " ".join(seg.text for seg in segments)
+        return await cls.transcribe_pcm(
+            audio_pcm,
+            sample_rate
+        )
 
 
 class VADService:
