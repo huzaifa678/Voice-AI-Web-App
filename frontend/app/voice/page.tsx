@@ -2,99 +2,103 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useStreamingSTT } from "./hooks/useStreamingSST";
-import { useAppDispatch } from "@redux/hooks"; 
+import { useAppDispatch } from "@redux/hooks";
 import { logout } from "@redux/authSlice";
+import { useStreamingSST } from "./hooks/useStreamingSST";
+import VoiceVisualizer from "../components/VoiceVisualizer";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function StreamingPage() {
-
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
-  const [audioObj, setAudioObj] = useState<HTMLAudioElement | null>(null);
+
   const router = useRouter();
   const dispatch = useAppDispatch();
 
   useEffect(() => {
     setAccessToken(localStorage.getItem("access-token"));
-    setRefreshToken(localStorage.getItem("refresh-token"));
   }, []);
-  console.log(accessToken)
-  console.log(refreshToken)
 
-  const { start, stop, transcript, llmResponse } = useStreamingSTT(
+  const {
+    start,
+    stop,
+    transcript,
+    llmResponse,
+    analyser,
+  } = useStreamingSST(
     "ws://localhost:8000/ws/audio/",
-    accessToken || undefined
+    accessToken ?? undefined
   );
 
-  useEffect(() => {
-    if (llmResponse?.audioBase64) {
-       console.log("LLM Audio Base64:", llmResponse?.audioBase64);
-      const audio = new Audio(`data:audio/wav;base64,${llmResponse.audioBase64}`);
-      setAudioObj(audio);
-    }
-  }, [llmResponse]);
-
-  const handlePlayAudio = () => {
-    if (audioObj) {
-      audioObj.play().catch(err => console.error("Audio play error:", err));
-    }
-  };
-
   const handleLogout = () => {
-    dispatch(logout())
+    dispatch(logout());
     router.push("/login");
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 p-6">
-      <div className="self-end">
+    <div className="flex min-h-screen flex-col items-center gap-6 p-8">
+      <div className="flex w-full justify-end">
         <button
           onClick={handleLogout}
-          className="bg-gray-500 text-white px-3 py-1 rounded text-sm"
+          className="rounded bg-gray-600 px-4 py-2 text-white hover:bg-gray-700"
         >
           Logout
         </button>
       </div>
 
-      <div className="flex gap-2">
+      <h1 className="text-3xl font-bold">
+        Streaming Speech-to-Text
+      </h1>
+
+      <VoiceVisualizer analyser={analyser} />
+
+      <div className="flex gap-4">
         <button
           onClick={start}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
+          className="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
         >
           Start
         </button>
 
         <button
           onClick={stop}
-          className="bg-red-500 text-white px-4 py-2 rounded"
+          className="rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700"
         >
           Stop
         </button>
       </div>
 
       {transcript && (
-        <div className="w-full max-w-xl p-4 bg-gray-100 rounded">
-          <h3 className="font-semibold mb-1">Transcript</h3>
-          <p>{transcript}</p>
+        <div className="w-full max-w-3xl rounded-xl border border-blue-200 bg-blue-50 p-5 shadow">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-xl">🎤</span>
+            <h2 className="font-semibold text-blue-700">
+              You
+            </h2>
+          </div>
+
+          <p className="whitespace-pre-wrap break-words text-gray-800">
+            {transcript}
+          </p>
         </div>
       )}
 
       {llmResponse && (
-        <div className="w-full max-w-xl p-4 bg-green-100 rounded">
-          <h3 className="font-semibold mb-1">LLM Response</h3>
-          <p>{llmResponse.llmResponse}</p>
-        </div>
-      )}
+        <div className="w-full max-w-3xl rounded-xl border border-green-200 bg-green-50 p-5 shadow">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-xl">🤖</span>
+            <h2 className="font-semibold text-green-700">
+              Assistant
+            </h2>
+          </div>
 
-      {llmResponse?.audioBase64 && (
-        <button
-          onClick={handlePlayAudio}
-          className="bg-yellow-500 text-white px-3 py-1 rounded"
-        >
-          Play LLM Audio
-        </button>
+          <div className="prose prose-slate max-w-none overflow-x-auto">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {llmResponse.llmResponse ?? ""}
+            </ReactMarkdown>
+          </div>
+        </div>
       )}
     </div>
   );
 }
-
