@@ -17,10 +17,17 @@ services:
       - "8000:8000"
     env_file:
       - .env.docker
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      LOG_FILE: "/var/log/app/app.log"
+    volumes:
+      - app_logs:/var/log/app
     depends_on:
       - postgres
       - redis
       - rabbitmq
+      - tempo
+      - otel-collector
     networks:
       - voice-ai-net
 
@@ -71,8 +78,85 @@ services:
     networks:
       - voice-ai-net
 
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: voice-ai-tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml
+      - tempo_data:/tmp/tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+    networks:
+      - voice-ai-net
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    container_name: voice-ai-otel-collector
+    command: [ "--config=/etc/otel-collector.yaml" ]
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otel-collector.yaml
+      - app_logs:/var/log/app
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+    depends_on:
+      - tempo
+      - loki
+    networks:
+      - voice-ai-net
+
+  loki:
+    image: grafana/loki:6.0.0
+    container_name: voice-ai-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+    networks:
+      - voice-ai-net
+
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: voice-ai-prometheus
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - voice-ai-net
+
+  grafana:
+    image: grafana/grafana-enterprise:11.2.0
+    container_name: voice-ai-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SERVER_DOMAINS=public
+      - GF_FEATURE_TOGGLES=exploretogray
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning
+      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "3000:3000"
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
+    networks:
+      - voice-ai-net
+
 volumes:
   postgres_data:
+  tempo_data:
+  loki_data:
+  prometheus_data:
+  grafana_data:
+  app_logs:
 
 networks:
   voice-ai-net:
