@@ -5,5 +5,5 @@ package audio;
 import "audio.proto";
 
 service AudioService {
-    rpc StreamTranscribe (stream AudioChunk) returns (TranscriptionResponse);
+    rpc StreamTranscribe (stream AudioChunk) returns (stream TranscriptionResponse);
 }
