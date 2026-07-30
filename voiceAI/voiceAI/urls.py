@@ -17,8 +17,11 @@ Including another URLconf
 
 from django.urls import include, path
 
+from app.common.prometheus import metrics
+
 urlpatterns = [
     path("api/auth/", include("app.auth.urls")),
     path("api/audio/", include("app.audio.urls")),
+    path("metrics/", metrics, name="prometheus-metrics"),
     path("", include("app.health.urls")),
 ]

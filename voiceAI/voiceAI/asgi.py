@@ -11,6 +11,10 @@ import os
 import django
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
+
+from app.common.telemetry import setup_telemetry
+
+setup_telemetry("voice-ai-web")
 django.setup()
 
 from app.common.logger import get_logger
