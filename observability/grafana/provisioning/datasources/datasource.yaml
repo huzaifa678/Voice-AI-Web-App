@@ -1,0 +1,78 @@
+apiVersion: 1
+
+datasources:
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: tempo
+    jsonData:
+      tracesToLogs:
+        datasourceUid: loki
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"
+        tags:
+          - key: service.name
+            value: service
+            source: label
+        filterText: "filter"
+        filterExtra: "trace_id"
+      tracesToProfiles:
+        provider: "profileMetric"
+        datasourceUid: tempo
+      tracesToTempo:
+        datasourceUid: tempo
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"
+      serviceMap:
+        color: server
+      search:
+        searchQueryPlaceholder: "Search traces"
+      nodeGraph:
+        enabled: true
+      tempo:
+        searchType: "traceql"
+      streaming:
+        enabled: true
+      lokiSearch:
+        queryTimeout: "30s"
+
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    uid: prometheus
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      incremental: true
+      cacheOnlineTimeout: "30s"
+      maxConcurrentRequests: 20
+      prometheusType: "Prometheus"
+      prometheusVersion: "2.54.0"
+      exemplarTraceIdDestinations:
+        - name: "trace_id"
+          datasourceUid: "tempo"
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: loki
+    jsonData:
+      multiTenant: false
+      access: "proxy"
+      handleGzip: true
+      jsonLogsToLabelCoords:
+        level: "level"
+        logger: "logger"
+        service: "service"
+        trace_id: "trace_id"
+        span_id: "span_id"
+      derivedFields:
+        - name: "Trace ID"
+          urlConfig:
+            urlLabel: "$.trace_id"
+            urlTemplate: "http://grafana:3000/explore?orgId=1&left=[\"now-1h\",\"now\",\" tempo-explore\",{\"query\":{\"service.name\":\"\"}},{\"datasourceId\":2},{\"traceId\":\"${__value.raw}\"}]"
+          matcher: ".*"
+          valueExtracted: "trace_id"
