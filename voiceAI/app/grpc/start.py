@@ -4,10 +4,12 @@ import asyncio
 import grpc
 from app.grpc import service_pb2_grpc
 from app.common.logger import get_logger
+from app.common.telemetry import setup_telemetry
 
 logger = get_logger(__name__)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
+setup_telemetry("voice-ai-grpc")
 django.setup()
 
 from app.grpc.service import AudioServicer

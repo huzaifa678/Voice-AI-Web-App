@@ -1,3 +1,4 @@
+import asyncio
 import grpc
 import pytest
 from unittest.mock import AsyncMock, patch
@@ -45,7 +46,6 @@ async def test_stream_transcribe_success():
         "app.grpc.service.VADService.is_speech", return_value=True
     ) as mock_vad, patch(
         "app.grpc.service.AudioService.transcribe_pcm",
-        new_callable=AsyncMock,
         return_value="hello world",
     ) as mock_transcribe, patch(
         "app.grpc.service.publish_audio_task", new_callable=AsyncMock
@@ -61,9 +61,12 @@ async def test_stream_transcribe_success():
 
         assert isinstance(response, audio_pb2.TranscriptionResponse)
         assert response.transcript == "hello world"
-        assert mock_vad.call_count >= 1
+        assert mock_vad.call_count == 1
         mock_transcribe.assert_called_once_with(SAMPLE_AUDIO_BYTES, 16000)
-        mock_publish.assert_awaited_once()
+        # publish_audio_task is fire-and-forget via asyncio.create_task
+        # Allow the event loop to process the created task
+        await asyncio.sleep(0)
+        mock_publish.assert_called_once()
         assert context.code is None
         assert context.details is None
 
@@ -83,3 +86,30 @@ async def test_stream_transcribe_no_audio():
     assert response.transcript == ""
     assert context.code == grpc.StatusCode.INVALID_ARGUMENT
     assert context.details == "No audio received"
+
+
+@pytest.mark.asyncio
+async def test_stream_transcribe_vad_blocks_short_audio():
+    """
+    When VAD returns False, transcription is skipped even if audio is present.
+    """
+    servicer = AudioServicer()
+
+    with patch(
+        "app.grpc.service.VADService.is_speech", return_value=False
+    ), patch(
+        "app.grpc.service.AudioService.transcribe_pcm"
+    ) as mock_transcribe, patch(
+        "app.grpc.service.publish_audio_task", new_callable=AsyncMock
+    ), patch(
+        "app.grpc.service.rate_limit", return_value=None
+    ):
+
+        async def request_gen():
+            yield DummyRequest(SAMPLE_AUDIO_BYTES)
+
+        context = DummyContext()
+        response = await servicer.StreamTranscribe(request_gen(), context)
+
+        assert response.transcript == ""
+        mock_transcribe.assert_not_called()
