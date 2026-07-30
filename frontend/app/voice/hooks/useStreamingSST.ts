@@ -7,12 +7,12 @@ import { refreshAccessToken } from "@/api/auth/refresh.route";
 import { jwtDecode } from "jwt-decode";
 
 export type LLMResponse = {
-    llmResponse?: string;
-    audioBase64?: string;
+  llmResponse?: string;
+  audioBase64?: string;
 };
 
-export function useStreamingSTT(wsUrl: string, token?: string) {
-  const [transcript, setTranscript] = useState<string>("");
+export function useStreamingSST(wsUrl: string, token?: string) {
+  const [transcript, setTranscript] = useState("");
   const [llmResponse, setLlmResponse] = useState<LLMResponse | null>(null);
 
   const recorder = useRecorder((pcmBuffer) => {
@@ -21,7 +21,18 @@ export function useStreamingSTT(wsUrl: string, token?: string) {
 
   const ws = useWebSocket(wsUrl, recorder, (event) => {
     const data = JSON.parse(event.data);
-    if (data.transcript) setTranscript(data.transcript);
+
+    console.log("WS MESSAGE:", data);
+
+    // if ("transcript" in data) {
+    //   console.log("TRANSCRIPT:", data.transcript);
+    // }
+
+    if (data.transcript) {
+      console.log("TRANSCRIPT:", data.transcript);
+      setTranscript(data.transcript);
+    }
+
     if (data.llmResponse || data.audioBase64) {
       setLlmResponse({
         llmResponse: data.llmResponse,
@@ -31,12 +42,12 @@ export function useStreamingSTT(wsUrl: string, token?: string) {
   });
 
   const isExpired = (token?: string) => {
-    if (!token) return true; 
+    if (!token) return true;
+
     try {
       const { exp } = jwtDecode<{ exp: number }>(token);
       return Date.now() >= exp * 1000;
-    } catch (err) {
-      console.warn("Invalid access token, treating as expired:", err);
+    } catch {
       return true;
     }
   };
@@ -46,47 +57,44 @@ export function useStreamingSTT(wsUrl: string, token?: string) {
     setLlmResponse(null);
 
     let access = token ?? store.getState().auth.accessToken;
-    const refresh = localStorage.getItem('refresh-token')
-
-    console.log(token)
-    console.log(access)
-    console.log("refresh", refresh)
-    console.log(store.getState().auth);
+    const refresh = localStorage.getItem("refresh-token");
 
     if (access && refresh && isExpired(access)) {
       try {
         const res = await refreshAccessToken(refresh);
-        const refreshedToken = await res.access.access;
-        access = refreshedToken;
-
-        console.log("ACCESS", access)
+        access = res.access.access;
 
         store.dispatch(
-          setCredentials({ access: access, refresh: refresh
+          setCredentials({
+            access,
+            refresh,
           })
         );
       } catch (err) {
-        console.error("Failed to refresh token", err);
+        console.error("Failed to refresh access token", err);
         return;
       }
     }
 
     if (!access) {
-      console.error("No valid access token available");
+      console.error("No valid access token");
       return;
     }
 
-    console.log("ACCESS2", access)
-
     await ws.connect(access);
-
     await recorder.start();
   };
 
-  const stop = () => {
-    recorder.stop();
+  const stop = async () => {
+    await recorder.stop();
     ws.close();
   };
 
-  return { start, stop, transcript, llmResponse };
+  return {
+    start,
+    stop,
+    transcript,
+    llmResponse,
+    analyser: recorder.analyser,
+  };
 }
