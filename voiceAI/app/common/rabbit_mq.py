@@ -3,6 +3,9 @@ import json
 import pika
 import os
 import aio_pika
+from app.common.telemetry import SpanKind, current_trace_headers, record_exception, tracer
+
+tracer = tracer(__name__)
 
 _rmq_connection = None
 
@@ -43,23 +46,40 @@ async def get_connection():
 
 
 async def publish_audio_task(user_id: str, audio_bytes: bytes):
+    with tracer.start_as_current_span(
+        "voice.rabbitmq.publish_audio_task",
+        kind=SpanKind.PRODUCER,
+        attributes={
+            "messaging.system": "rabbitmq",
+            "messaging.destination.name": "audio_tasks",
+            "voice.audio_bytes": len(audio_bytes),
+            "voice.user_id": str(user_id) if user_id else "anonymous",
+        },
+    ) as span:
+        try:
+            channel = await get_persistent_channel()
 
-    channel = await get_persistent_channel()
+            await channel.declare_queue("audio_tasks", durable=True)
 
-    await channel.declare_queue("audio_tasks", durable=True)
+            trace_headers = current_trace_headers()
+            payload = {
+                "user_id": user_id,
+                "audio_bytes": base64.b64encode(audio_bytes).decode(),
+                "trace": trace_headers,
+            }
 
-    payload = {
-        "user_id": user_id,
-        "audio_bytes": base64.b64encode(audio_bytes).decode(),
-    }
-
-    await channel.default_exchange.publish(
-        aio_pika.Message(
-            body=json.dumps(payload).encode(),
-            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-        ),
-        routing_key="audio_tasks",
-    )
+            await channel.default_exchange.publish(
+                aio_pika.Message(
+                    body=json.dumps(payload).encode(),
+                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                    content_type="application/json",
+                    headers=trace_headers,
+                ),
+                routing_key="audio_tasks",
+            )
+        except Exception as exc:
+            record_exception(span, exc)
+            raise
 
 
 async def publish_audio_response(
@@ -71,28 +91,48 @@ async def publish_audio_response(
     - response: text from LLM
     - audio_bytes: base64-encoded audio for TTS
     """
-    connection = await get_connection()
-    channel = await connection.channel()
+    with tracer.start_as_current_span(
+        "voice.rabbitmq.publish_audio_response",
+        kind=SpanKind.PRODUCER,
+        attributes={
+            "messaging.system": "rabbitmq",
+            "messaging.destination.name": "audio_responses",
+            "voice.user_id": str(user_id) if user_id else "anonymous",
+            "voice.response_chars": len(response or ""),
+            "voice.tts.audio_base64_chars": len(audio_bytes or ""),
+        },
+    ) as span:
+        channel = None
+        try:
+            connection = await get_connection()
+            channel = await connection.channel()
 
-    exchange = await channel.declare_exchange(
-        "audio_responses_exchange", aio_pika.ExchangeType.DIRECT, durable=True
-    )
+            exchange = await channel.declare_exchange(
+                "audio_responses_exchange", aio_pika.ExchangeType.DIRECT, durable=True
+            )
 
-    payload = {"user_id": user_id}
-    if response is not None:
-        payload["response"] = response
-    if audio_bytes is not None:
-        payload["audio_bytes"] = audio_bytes
+            trace_headers = current_trace_headers()
+            payload = {"user_id": user_id, "trace": trace_headers}
+            if response is not None:
+                payload["response"] = response
+            if audio_bytes is not None:
+                payload["audio_bytes"] = audio_bytes
 
-    await exchange.publish(
-        aio_pika.Message(
-            body=json.dumps(payload).encode(),
-            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-        ),
-        routing_key="audio_responses",
-    )
-
-    await channel.close()
+            await exchange.publish(
+                aio_pika.Message(
+                    body=json.dumps(payload).encode(),
+                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                    content_type="application/json",
+                    headers=trace_headers,
+                ),
+                routing_key="audio_responses",
+            )
+        except Exception as exc:
+            record_exception(span, exc)
+            raise
+        finally:
+            if channel is not None:
+                await channel.close()
 
 
 async def publish_email_task(email_data: dict):

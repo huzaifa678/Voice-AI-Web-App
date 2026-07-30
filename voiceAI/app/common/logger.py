@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 
 _logging_configured = False
@@ -12,14 +13,21 @@ def setup_logging() -> None:
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
+    formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     if not root.handlers:
         handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter(
-            "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
         handler.setFormatter(formatter)
         root.addHandler(handler)
+
+    log_file = os.getenv("LOG_FILE")
+    if log_file:
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(formatter)
+        root.addHandler(file_handler)
 
     _logging_configured = True
 
