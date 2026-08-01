@@ -34,16 +34,7 @@ async def wait_for_server():
     raise RuntimeError("Backend never became ready")
 
 
-@pytest.mark.asyncio
-async def test_audio_flow_e2e_smoke():
-    await wait_for_server()
-
-    http_base = HTTP_BASE
-    ws_base = WS_URL
-
-    logger.debug("HTTP_BASE = %s", http_base)
-    logger.debug("WS_URL = %s", ws_base)
-
+async def login():
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             f"{HTTP_BASE}/auth/register/",
@@ -66,67 +57,113 @@ async def test_audio_flow_e2e_smoke():
         )
 
         assert resp.status_code == 200
-        resp_json = resp.json()
-        logger.debug("resp_json: %s", resp_json)
-        access_token = resp.json()["access"]["access"]
-        logger.debug("access_token type: %s", type(access_token))
+        return resp.json()["access"]["access"]
 
-    ws_url = f"{ws_base}?token={quote(access_token)}"
+
+def load_fixture(filename):
+    pcm, sr = sf.read(f"fixtures/{filename}", dtype="int16")
+    assert sr == TARGET_SR
+    return pcm
+
+
+def silence(seconds):
+    return np.zeros(int(TARGET_SR * seconds), dtype=np.int16)
+
+
+async def stream_audio(websocket, pcm):
+    pcm16 = pcm.astype(np.int16).tobytes()
+    frame_bytes = 512 * 2
+
+    for i in range(0, len(pcm16), frame_bytes):
+        await websocket.send(pcm16[i : i + frame_bytes])
+        await asyncio.sleep(0.01)
+
+    trailing = silence(2.5).tobytes()
+    for i in range(0, len(trailing), frame_bytes):
+        await websocket.send(trailing[i : i + frame_bytes])
+        await asyncio.sleep(0.01)
+
+    await asyncio.sleep(1.5)
+    await websocket.send(b"")
+
+
+async def collect_responses(websocket, deadline_seconds=240):
+    transcript_received = False
+    llm_received = False
+    tts_received = False
+    tts_audio_bytes = b""
+    deadline = asyncio.get_event_loop().time() + deadline_seconds
+
+    while asyncio.get_event_loop().time() < deadline:
+        try:
+            msg = await asyncio.wait_for(websocket.recv(), timeout=15)
+        except asyncio.TimeoutError:
+            continue
+
+        payload = json.loads(msg)
+
+        if "transcript" in payload:
+            transcript_received = True
+            logger.info("TRANSCRIPT: %s", payload["transcript"])
+
+        if "llmResponse" in payload:
+            llm_received = True
+            logger.info("LLM: %s", payload["llmResponse"])
+
+        if "audioBase64" in payload and payload["audioBase64"] is not None:
+            tts_received = True
+            tts_audio_bytes = base64.b64decode(payload["audioBase64"])
+            logger.info("TTS audio received: %d bytes", len(tts_audio_bytes))
+
+        if transcript_received and llm_received and tts_received:
+            break
+
+    return transcript_received, llm_received, tts_received, tts_audio_bytes
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "name,fixture",
+    [
+        ("full", "test.wav"),
+        ("partial", "test_partial.wav"),
+        ("paused", "test_paused.wav"),
+        ("stuttering", "test_stuttering.wav"),
+        ("quiet", "test_quiet.wav"),
+        ("loud", "test_loud.wav"),
+        ("noisy", "test_noisy.wav"),
+        ("long_pause", "test_long_pause.wav"),
+        ("clipped_start", "test_clipped_start.wav"),
+        ("fast", "test_fast.wav"),
+        ("slow", "test_slow.wav"),
+        ("repeat", "test_repeat.wav"),
+        ("fade_in", "test_fade_in.wav"),
+        ("echo", "test_echo.wav"),
+    ],
+)
+async def test_audio_flow_e2e_smoke(name, fixture):
+    await wait_for_server()
+
+    logger.debug("HTTP_BASE = %s", HTTP_BASE)
+    logger.debug("WS_URL = %s", WS_URL)
+    logger.info("Running audio flow case: %s", name)
+
+    access_token = await login()
+
+    ws_url = f"{WS_URL}?token={quote(access_token)}"
 
     async with connect(
         ws_url,
         max_size=50 * 1024 * 1024,
     ) as websocket:
-        pcm, sr = sf.read("fixtures/test.wav", dtype="int16")
-        assert sr == TARGET_SR
-        pcm16 = pcm.tobytes()
+        await stream_audio(websocket, load_fixture(fixture))
 
-        frame_bytes = 512 * 2
-        for i in range(0, len(pcm16), frame_bytes):
-            await websocket.send(pcm16[i : i + frame_bytes])
-            await asyncio.sleep(0.01)
-
-        silence_duration_sec = 2.5
-        silence = np.zeros(
-            int(TARGET_SR * silence_duration_sec), dtype=np.int16
-        ).tobytes()
-
-        for i in range(0, len(silence), frame_bytes):
-            await websocket.send(silence[i : i + frame_bytes])
-            await asyncio.sleep(0.01)
-
-        await asyncio.sleep(1.5)
-        await websocket.send(b"")
-
-        transcript_received = False
-        llm_received = False
-        tts_received = False
-        tts_audio_bytes = b""
-        deadline = asyncio.get_event_loop().time() + 240
-
-        while asyncio.get_event_loop().time() < deadline:
-            try:
-                msg = await asyncio.wait_for(websocket.recv(), timeout=15)
-            except asyncio.TimeoutError:
-                continue
-
-            payload = json.loads(msg)
-
-            if "transcript" in payload:
-                transcript_received = True
-                logger.info("TRANSCRIPT: %s", payload["transcript"])
-
-            if "llmResponse" in payload:
-                llm_received = True
-                logger.info("LLM: %s", payload["llmResponse"])
-
-            if "audioBase64" in payload and payload["audioBase64"] is not None:
-                tts_received = True
-                tts_audio_bytes = base64.b64decode(payload["audioBase64"])
-                logger.info("TTS audio received: %d bytes", len(tts_audio_bytes))
-
-            if transcript_received and llm_received and tts_received:
-                break
+        (
+            transcript_received,
+            llm_received,
+            tts_received,
+            tts_audio_bytes,
+        ) = await collect_responses(websocket)
 
         assert transcript_received, "gRPC transcription never returned"
         assert llm_received, "LLM response never returned"
