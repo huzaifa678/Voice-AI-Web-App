@@ -1,9 +1,6 @@
-auth_enabled: false
-
 server:
   http_listen_port: 3200
-  grpc_listen_port: 4317
-  log_level: info
+  http_listen_address: 0.0.0.0
 
 distributor:
   receivers:
@@ -15,26 +12,19 @@ distributor:
           endpoint: 0.0.0.0:4318
 
 ingester:
-  max_block_size: 5000000
-  complete_telemetry_interval: 5s
   max_block_duration: 5m
-  flush_internal: 15s
+
+compactor:
+  compaction:
+    block_retention: 24h
 
 storage:
   trace:
     backend: local
     local:
-      path: /tmp/tempo/traces
-    pool:
-      max_worker_pool_size: 100
-      queue_channel_size: 1000
+      path: /var/tempo/traces
 
-query:
-  default_resultset_limit: 500
-  hide_query_schema: false
-  search:
-    advanced: true
-
-metrics:
-  prometheus:
-    endpoint: 0.0.0.0:3201
+overrides:
+  defaults:
+    ingestion:
+      rate_limit_bytes: 20000000
