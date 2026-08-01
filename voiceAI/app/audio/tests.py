@@ -1,7 +1,9 @@
 import pytest
 import asyncio
+from collections import deque
 from unittest.mock import AsyncMock, patch, MagicMock
 from app.audio.consumers import AudioStreamConsumer
+from app.audio.session import VoiceSession
 
 
 @pytest.mark.asyncio
@@ -24,8 +26,8 @@ async def test_connect_success(monkeypatch):
 
     consumer.accept.assert_called_once()
     assert consumer.user_id == 1
-    assert consumer.in_speech is False
-    assert isinstance(consumer.vad_frame_buffer, type(consumer.vad_frame_buffer))
+    assert consumer.session.in_speech is False
+    assert isinstance(consumer.vad_frame_buffer, deque)
     assert isinstance(consumer.session.audio_buffer, bytearray)
 
 
@@ -50,6 +52,7 @@ async def test_connect_unauthorized():
 async def test_process_buffer_short_audio():
     consumer = AudioStreamConsumer()
     consumer.user_id = 1
+    consumer.session = VoiceSession(user_id="1")
     consumer.session.audio_buffer = bytearray(b"\x00" * 1000)
     consumer.log = AsyncMock()
     consumer.send = AsyncMock()
@@ -63,7 +66,9 @@ async def test_process_buffer_short_audio():
 async def test_process_buffer_success():
     consumer = AudioStreamConsumer()
     consumer.user_id = 1
+    consumer.session = VoiceSession(user_id="1")
     consumer.session.audio_buffer = bytearray(b"\x00" * 20000)
+    consumer._grpc_host = "localhost:50051"
     consumer.log = AsyncMock()
     consumer.send = AsyncMock()
     consumer.grpc_stub = MagicMock()
@@ -85,6 +90,7 @@ async def test_process_buffer_success():
 async def test_send_to_grpc_timeout(monkeypatch):
     consumer = AudioStreamConsumer()
     consumer.user_id = 1
+    consumer._grpc_host = "localhost:50051"
     consumer.log = AsyncMock()
     consumer.grpc_stub = MagicMock()
 
@@ -102,11 +108,12 @@ async def test_send_to_grpc_timeout(monkeypatch):
 async def test_disconnect_cleanup():
     consumer = AudioStreamConsumer()
     consumer.user_id = 1
-    consumer.log_task = AsyncMock()
-    consumer.listen_task = AsyncMock()
+    consumer.session = VoiceSession(user_id="1")
+    consumer.log_task = MagicMock()
+    consumer.listen_task = MagicMock()
     consumer.grpc_channel = AsyncMock()
+    grpc_channel = consumer.grpc_channel
 
-    from collections import deque
     consumer.vad_frame_buffer = deque([1, 2, 3])
     consumer.session.audio_buffer = bytearray(b"abc")
     consumer.session.in_speech = True
@@ -118,4 +125,4 @@ async def test_disconnect_cleanup():
     assert consumer.session.in_speech is False
     assert len(consumer.session.prob_history) == 0
     assert len(consumer.vad_frame_buffer) == 0
-    consumer.grpc_channel.close.assert_called_once()
+    grpc_channel.close.assert_called_once()

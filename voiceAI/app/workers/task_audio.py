@@ -1,9 +1,7 @@
 import asyncio
-import base64
 import json
 import os
 import aio_pika
-from app.audio.services import AudioService
 from app.llm.services import LLMService
 from app.common.rabbit_mq import get_connection, publish_audio_response
 from app.common.logger import get_logger
@@ -26,15 +24,12 @@ async def handle_message(message: aio_pika.IncomingMessage):
         context=parent_context,
     ) as span:
         try:
-            audio_bytes = base64.b64decode(payload["audio_bytes"])
-            span.set_attribute("voice.audio_bytes", len(audio_bytes))
-
             logger.info("inside the handle message method")
 
-            text = await AudioService.process_audio(audio_bytes)
+            text = payload.get("transcript")
 
             if text is None:
-                logger.info("Speech-to-text returned None")
+                logger.info("No transcript in payload")
                 await message.ack()
                 return
 

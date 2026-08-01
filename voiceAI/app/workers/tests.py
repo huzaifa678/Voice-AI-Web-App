@@ -54,12 +54,9 @@ def test_handle_email_message_success(mock_send_mail):
     "app.workers.task_audio.LLMService.query_from_text_async", new_callable=AsyncMock
 )
 @patch("app.workers.task_audio.get_connection")
-@patch("app.workers.task_audio.AudioService.process_audio")
 async def test_handle_message_success(
-    mock_process_audio, mock_get_connection, mock_query_llm, mock_publish
+    mock_get_connection, mock_query_llm, mock_publish
 ):
-    mock_process_audio.return_value = "Hello world"
-
     mock_query_llm.return_value = "LLM response text"
 
     mock_channel = AsyncMock()
@@ -67,12 +64,11 @@ async def test_handle_message_success(
     mock_connection.channel = AsyncMock(return_value=mock_channel)
     mock_get_connection.return_value = mock_connection
 
-    payload = {"audio_bytes": base64.b64encode(b"fake audio").decode(), "user_id": 123}
+    payload = {"transcript": "Hello world", "user_id": 123}
     message = FakeAudioMessage(json.dumps(payload).encode())
 
     await handle_message(message)
 
-    mock_process_audio.assert_called_once()
     mock_query_llm.assert_called_once_with(text="Hello world")
     mock_publish.assert_called_once_with(user_id=123, response="LLM response text")
     message.ack.assert_called_once()
@@ -80,19 +76,9 @@ async def test_handle_message_success(
 
 
 @pytest.mark.asyncio
-@patch("app.workers.task_audio.AudioService.process_audio")
 @patch("app.workers.task_audio.get_connection", new_callable=AsyncMock)
-async def test_handle_message_empty_audio(mock_get_connection, mock_process_audio):
-    mock_process_audio.return_value = ""  # empty string
-
-    mock_channel = AsyncMock()
-
-    mock_connection = AsyncMock()
-    mock_connection.channel.return_value = mock_channel
-
-    mock_get_connection.return_value = mock_connection
-
-    payload = {"audio_bytes": base64.b64encode(b"fake audio").decode()}
+async def test_handle_message_empty_transcript(mock_get_connection):
+    payload = {"transcript": ""}
     message = FakeAudioMessage(json.dumps(payload).encode())
 
     from app.workers.task_audio import handle_message
@@ -103,17 +89,14 @@ async def test_handle_message_empty_audio(mock_get_connection, mock_process_audi
 
 
 @pytest.mark.asyncio
-@patch("app.workers.task_audio.AudioService.process_audio")
 @patch(
     "app.workers.task_audio.LLMService.query_from_text_async", new_callable=AsyncMock
 )
 @patch("app.workers.task_audio.get_connection", new_callable=AsyncMock)
-async def test_handle_message_exception(
-    mock_get_connection, mock_query_llm, mock_process_audio
-):
-    mock_process_audio.side_effect = Exception("Audio processing failed")
+async def test_handle_message_exception(mock_get_connection, mock_query_llm):
+    mock_query_llm.side_effect = Exception("LLM query failed")
 
-    payload = {"audio_bytes": base64.b64encode(b"fake audio").decode()}
+    payload = {"transcript": "Hello world"}
     message = FakeAudioMessage(json.dumps(payload).encode())
 
     from app.workers.task_audio import handle_message

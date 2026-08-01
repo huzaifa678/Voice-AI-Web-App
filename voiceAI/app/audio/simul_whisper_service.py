@@ -22,7 +22,10 @@ class SimulWhisperService:
     _asr = None
     _online = None
 
-    MODEL_PATH = "/app/models/base"
+    MODEL_PATH = os.getenv(
+        "WHISPER_MODEL_PATH",
+        "/app/models/whisper/large-v3.pt"
+    )
 
     @classmethod
     def model(cls):

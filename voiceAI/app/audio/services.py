@@ -62,7 +62,7 @@ async def transcribe_audio_bytes(audio_bytes: bytes, user_id: str):
 
                 await publish_audio_task(
                     user_id=user_id,
-                    audio_bytes=audio_bytes,
+                    transcript=text,
                 )
 
                 return {"transcript": text}

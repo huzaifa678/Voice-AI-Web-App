@@ -136,7 +136,7 @@ DATABASES = {
         "NAME": "voice_ai_db",
         "USER": "postgres",
         "PASSWORD": "postgres",
-        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
+        "HOST": os.getenv("POSTGRES_HOST", "pgbouncer"),
         "PORT": os.getenv("POSTGRES_PORT", 6432),
         "CONN_MAX_AGE": 0,
     }

@@ -1,4 +1,3 @@
-import base64
 import json
 import pika
 import os
@@ -45,14 +44,14 @@ async def get_connection():
     return _rmq_connection
 
 
-async def publish_audio_task(user_id: str, audio_bytes: bytes):
+async def publish_audio_task(user_id: str, transcript: str):
     with tracer.start_as_current_span(
         "voice.rabbitmq.publish_audio_task",
         kind=SpanKind.PRODUCER,
         attributes={
             "messaging.system": "rabbitmq",
             "messaging.destination.name": "audio_tasks",
-            "voice.audio_bytes": len(audio_bytes),
+            "voice.transcript_chars": len(transcript or ""),
             "voice.user_id": str(user_id) if user_id else "anonymous",
         },
     ) as span:
@@ -64,7 +63,7 @@ async def publish_audio_task(user_id: str, audio_bytes: bytes):
             trace_headers = current_trace_headers()
             payload = {
                 "user_id": user_id,
-                "audio_bytes": base64.b64encode(audio_bytes).decode(),
+                "transcript": transcript,
                 "trace": trace_headers,
             }
 

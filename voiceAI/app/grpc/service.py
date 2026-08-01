@@ -212,19 +212,13 @@ class AudioServicer(
                     transcript
                 )
 
-                audio_bytes = (
-                    b"".join(audio_chunks)
-                    if audio_chunks
-                    else b""
-                )
-
                 asyncio.create_task(
                     publish_audio_task(
                         user_id=str(user.id)
                         if user
                         else None,
 
-                        audio_bytes=audio_bytes,
+                        transcript=transcript,
                     )
                 )
 
