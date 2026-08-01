@@ -19,6 +19,7 @@ psycopg2-binary
 transformers==4.44.2
 numpy==1.26.4
 pika
+tiktoken
 soundfile==0.14.0
 django-cors-headers==4.9.0
 uvicorn[standard]==0.51.0
