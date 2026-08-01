@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   web:
-    image: voice-ai-web:latest
+    image: voice-ai-web:v1.0.1
     container_name: voice-ai-web
     command: >
       sh -c "
@@ -79,74 +79,109 @@ services:
       - voice-ai-net
 
   tempo:
-    image: grafana/tempo:2.6.1
+    image: grafana/tempo:2.8.2
     container_name: voice-ai-tempo
-    command: [ "-config.file=/etc/tempo.yaml" ]
+
+    command: ["-config.file=/etc/tempo.yaml"]
+
     volumes:
-      - ./observability/tempo.yaml:/etc/tempo.yaml
-      - tempo_data:/tmp/tempo
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+
     ports:
       - "3200:3200"
-      - "4317:4317"
+
+    restart: unless-stopped
+
     networks:
       - voice-ai-net
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.110.0
+    image: otel/opentelemetry-collector-contrib:0.130.1
     container_name: voice-ai-otel-collector
-    command: [ "--config=/etc/otel-collector.yaml" ]
+
+    command:
+      - "--config=/etc/otel-collector.yaml"
+
     volumes:
-      - ./observability/otel-collector.yaml:/etc/otel-collector.yaml
+      - ./observability/otel-collector.yaml:/etc/otel-collector.yaml:ro
       - app_logs:/var/log/app
+
     ports:
-      - "4317:4317"
-      - "4318:4318"
+      - "43170:4317"
+      - "43180:4318"
       - "8888:8888"
+
     depends_on:
       - tempo
       - loki
+
+    restart: unless-stopped
+
     networks:
       - voice-ai-net
 
   loki:
-    image: grafana/loki:6.0.0
+    image: grafana/loki:3.5.5
     container_name: voice-ai-loki
-    command: -config.file=/etc/loki/local-config.yaml
+
+    command:
+      - "-config.file=/etc/loki/local-config.yaml"
+
     ports:
       - "3100:3100"
+
     volumes:
+      - ./observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki_data:/loki
+
+    restart: unless-stopped
+
     networks:
       - voice-ai-net
 
   prometheus:
-    image: prom/prometheus:v2.54.0
+    image: prom/prometheus:v3.5.0
     container_name: voice-ai-prometheus
+
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+
     volumes:
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
+
     ports:
       - "9090:9090"
+
+    restart: unless-stopped
+
     networks:
       - voice-ai-net
 
   grafana:
-    image: grafana/grafana-enterprise:11.2.0
+    image: grafana/grafana:12.1.1
     container_name: voice-ai-grafana
+
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_SERVER_DOMAINS=public
-      - GF_FEATURE_TOGGLES=exploretogray
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+    ports:
+      - "3001:3000"
+
     volumes:
       - grafana_data:/var/lib/grafana
       - ./observability/grafana/provisioning:/etc/grafana/provisioning
-      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
-    ports:
-      - "3000:3000"
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards
+
     depends_on:
+      - prometheus
       - tempo
       - loki
-      - prometheus
+
+    restart: unless-stopped
+
     networks:
       - voice-ai-net
 

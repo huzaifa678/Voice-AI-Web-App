@@ -25,6 +25,7 @@ django-cors-headers==4.9.0
 uvicorn[standard]==0.51.0
 scipy>=1.17,<1.18
 aio_pika==9.6.2
+tiktoken
 grpcio
 grpcio-tools
 opentelemetry-api

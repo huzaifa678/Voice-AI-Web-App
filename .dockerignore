@@ -9,3 +9,4 @@ kind
 e2e
 .pytest_cache
 .github
+observability
