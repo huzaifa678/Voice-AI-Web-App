@@ -1,0 +1,17 @@
+{{- if .Values.gpu.timeSlicing.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: time-slicing-config
+  namespace: {{ .Values.gpu.timeSlicing.namespace }}
+data:
+  {{ .Values.gpu.timeSlicing.profile }}: |-
+    version: v1
+    flags:
+      migStrategy: none
+    sharing:
+      timeSlicing:
+        resources:
+          - name: nvidia.com/gpu
+            replicas: {{ .Values.gpu.timeSlicing.replicas }}
+{{- end }}

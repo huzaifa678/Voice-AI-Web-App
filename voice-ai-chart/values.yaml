@@ -12,33 +12,71 @@ ttsWorker:
 xtts:
   enableInitContainer: true
 
+gpu:
+  grpc: 1
+  ttsWorker: 1
+  timeSlicing:
+    enabled: true
+    namespace: gpu-operator-resources
+    profile: any
+    replicas: 2
+
 volumeMounts:
   xttsModel:
     name: xtts-model
     mountPath: /app/models/xtts
 
+  whisperModel:
+    name: whisper-model
+    mountPath: /app/models/whisper
+
 volumeClaim:
   name: xtts-model-pvc
+  whisperName: whisper-model-pvc
 
 image:
   repository: huzaifagill234/voice-ai-web
-  tag: ci
+  tag: ci-v1.0.1
   imagePullPolicy: Always
 
 e2e:
   image:
     repository: huzaifagill234/e2e-runner
-    tag: ci       
+    tag: ci
     pullPolicy: IfNotPresent
   env:
     HTTP_BASE: "http://voice-ai:8000/api"
     HTTP_BASE_HEALTH: "http://voice-ai:8000"
     WS_URL: "ws://voice-ai:8000/ws/audio/"
 
+pgbouncer:
+  enabled: true
+  replicaCount: 1
+  service:
+    port: 6432
+  config:
+    adminUser: pgbouncer
+    adminPassword: pgbouncer
+    databases:
+      voice_ai_db:
+        host: voice-ai-postgresql
+        port: 5432
+        dbname: voice_ai_db
+        user: postgres
+        password: postgres
+    userlist:
+      postgres: postgres
+    pgbouncer:
+      auth_type: md5
+      pool_mode: transaction
+      default_pool_size: "20"
+      max_client_conn: "200"
+      ignore_startup_parameters: extra_float_digits
+
 env:
-  POSTGRES_HOST: voice-ai-postgresql
+  POSTGRES_HOST: voice-ai-pgbouncer
   POSTGRES_DB: voice_ai_db
-  POSTGRES_PORT: 5432
+  POSTGRES_PORT: 6432
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
   REDIS_HOST: voice-ai-redis-master
@@ -51,6 +89,14 @@ env:
   ALLOWED_HOSTS: "voice-ai,voice-ai.default.svc.cluster.local,localhost,127.0.0.1"
   GRPC_DEPLOYMENT_TYPE: remote
   ENVIRONMENT: infra-test
+  OTEL_SERVICE_NAME: voice-ai
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_METRICS_EXPORTER: otlp
+  OTEL_LOGS_EXPORTER: otlp
+  OTEL_RESOURCE_ATTRIBUTES: deployment.environment=infra-test
+  WHISPER_MODEL_PATH: /app/models/whisper/large-v3.pt
 
 postgresql:
   auth:
@@ -76,3 +122,172 @@ rabbitmq:
 service:
   type: ClusterIP
   port: 8000
+
+kube-prometheus-stack:
+  enabled: true
+
+  grafana:
+    enabled: true
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      path: /grafana
+      pathType: Prefix
+
+  prometheus:
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      paths:
+        - /prometheus
+
+loki:
+  enabled: true
+
+  storage:
+    bucketNames:
+      chunks: voice-ai-loki
+      ruler: voice-ai-loki
+      admin: voice-ai-loki
+
+tempo:
+  enabled: true
+
+  storage:
+    trace:
+      backend: s3
+      s3:
+        bucket: voice-ai-tempo
+        region: us-east-1
+
+thanos:
+  enabled: true
+
+  objstoreConfig: |
+    type: S3
+    config:
+      bucket: voice-ai-thanos
+      region: us-east-1
+
+ingress-nginx:
+  enabled: true
+
+  controller:
+    service:
+      type: LoadBalancer
+
+whisper:
+  enableInitContainer: true
+
+opentelemetry-collector:
+  enabled: true
+
+  mode: deployment
+
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+      filelog:
+        include:
+          - /var/log/app/*.log
+        start_at: beginning
+
+        operators:
+          - type: regex_parser
+            regex: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| (?P<level>\w+) \| (?P<logger>[^|]+) \| (?P<message>.*)$'
+
+            timestamp:
+              parse_from: attributes.time
+              layout: "%Y-%m-%d %H:%M:%S"
+
+            severity:
+              parse_from: attributes.level
+
+          - type: move
+            from: attributes.message
+            to: body
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+        spike_limit_percentage: 25
+
+      batch:
+        send_batch_size: 1024
+        timeout: 10s
+
+      attributes:
+        actions:
+          - action: upsert
+            key: service.name
+            value: voice-ai
+
+          - action: upsert
+            key: service.namespace
+            value: voice-ai
+
+          - action: upsert
+            key: deployment.environment
+            value: infra-test
+
+    exporters:
+      otlp/tempo:
+        endpoint: voice-ai-tempo:4317
+        tls:
+          insecure: true
+
+      prometheus:
+        endpoint: "0.0.0.0:8889"
+
+      otlphttp/loki:
+        endpoint: http://voice-ai-loki:3100/otlp
+
+      debug: {}
+
+    service:
+      telemetry:
+        logs:
+          level: info
+
+      pipelines:
+        traces:
+          receivers:
+            - otlp
+          processors:
+            - memory_limiter
+            - batch
+            - attributes
+          exporters:
+            - otlp/tempo
+            - debug
+
+        logs:
+          receivers:
+            - otlp
+            - filelog
+          processors:
+            - memory_limiter
+            - batch
+            - attributes
+          exporters:
+            - otlphttp/loki
+            - debug
+
+        metrics:
+          receivers:
+            - otlp
+          processors:
+            - memory_limiter
+            - batch
+            - attributes
+          exporters:
+            - prometheus
+            - debug
+            

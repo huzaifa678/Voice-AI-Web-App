@@ -83,6 +83,22 @@ spec:
               port: 50051
             initialDelaySeconds: 5
             periodSeconds: 5
+          volumeMounts:
+            - name: whisper-model
+              mountPath: /app/models/whisper
+          resources:
+            requests:
+              cpu: "1"
+              memory: "4Gi"
+              nvidia.com/gpu: {{ .Values.gpu.grpc }}
+            limits:
+              cpu: "2"
+              memory: "8Gi"
+              nvidia.com/gpu: {{ .Values.gpu.grpc }}
+      volumes:
+        - name: whisper-model
+          persistentVolumeClaim:
+            claimName: {{ .Values.volumeClaim.whisperName }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -163,11 +179,11 @@ spec:
             requests:
               cpu: "1"
               memory: "4Gi"
-              nvidia.com/gpu: 1 
+              nvidia.com/gpu: {{ .Values.gpu.ttsWorker }}
             limits:
               cpu: "2"
               memory: "6Gi"
-              nvidia.com/gpu: 1 
+              nvidia.com/gpu: {{ .Values.gpu.ttsWorker }}
       volumes:
         - name: xtts-model
           persistentVolumeClaim:

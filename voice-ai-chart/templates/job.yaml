@@ -50,3 +50,58 @@ spec:
         - name: xtts-model
           persistentVolumeClaim:
             claimName: {{ .Values.volumeClaim.name }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: whisper-model-download
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+
+      containers:
+        - name: whisper-downloader
+          image: python:3.11-slim
+
+          command:
+            - sh
+            - -c
+            - |
+              MODEL_DIR="/app/models/whisper"
+
+              if [ -f "$MODEL_DIR/large-v3.pt" ]; then
+                echo "Whisper model already exists. Skipping download."
+                exit 0
+              fi
+
+              echo "Downloading Whisper large model..."
+
+              apt-get update && apt-get install -y --no-install-recommends \
+                curl git \
+                && rm -rf /var/lib/apt/lists/*
+
+              pip install --upgrade pip
+              pip install --no-cache-dir openai-whisper
+
+              python3 - <<EOF
+              import whisper
+
+              whisper.load_model(
+                  "large",
+                  download_root="/app/models/whisper"
+              )
+              EOF
+
+              echo "Whisper model downloaded successfully."
+
+          volumeMounts:
+            - name: {{ .Values.volumeMounts.whisperModel.name }}
+              mountPath: {{ .Values.volumeMounts.whisperModel.mountPath }}
+
+      volumes:
+        - name: whisper-model
+          persistentVolumeClaim:
+            claimName: {{ .Values.volumeClaim.whisperName }}
+            

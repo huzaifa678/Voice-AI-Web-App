@@ -1,0 +1,28 @@
+voice-ai was released into the "{{ .Release.Namespace }}" namespace.
+
+Install into a dedicated namespace with:
+
+  helm upgrade --install voice-ai ./ --namespace voice-ai --create-namespace
+
+{{- if .Values.pgbouncer.enabled }}
+
+The app connects to PostgreSQL through PgBouncer at {{ .Values.env.POSTGRES_HOST }}:{{ .Values.env.POSTGRES_PORT }}.
+{{- end }}
+{{- if .Values.gpu.timeSlicing.enabled }}
+
+GPU TIME-SLICING IS ENABLED
+
+The "time-slicing-config" ConfigMap was applied to the {{ .Values.gpu.timeSlicing.namespace }} namespace,
+advertising each GPU as {{ .Values.gpu.timeSlicing.replicas }} slices so the STT (gRPC) and TTS pods can
+share one physical GPU.
+
+This only takes effect once the GPU operator's ClusterPolicy references it. Run once per cluster:
+
+  microk8s kubectl patch clusterpolicy cluster-policy -n {{ .Values.gpu.timeSlicing.namespace }} \
+    --type merge -p '{"spec":{"devicePlugin":{"config":{"name":"time-slicing-config","default":"{{ .Values.gpu.timeSlicing.profile }}"}}}}'
+
+Then confirm the node advertises {{ .Values.gpu.timeSlicing.replicas }} GPUs:
+
+  microk8s kubectl get node -o jsonpath='{.items[0].status.capacity.nvidia\.com/gpu}'
+
+{{- end }}
