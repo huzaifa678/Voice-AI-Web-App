@@ -18,6 +18,12 @@
 
 6. The task sent to the TTS worker is handled by the TTS service and the response is published to the websocket handler which then displays the audio response from the LLM text
 
+### Application Flow Diagram:
+
+The diagram below maps the flow explained above -> from the browser mic to the Silero VAD, the gRPC Whisper STT, the RabbitMQ queues, the LLM and TTS workers and finally back to the Frontend. It also shows Redis rate limiting the API and the DB connections being pooled through PgBouncer before hitting Postgres:
+
+![Application Flow](docs/architecture-flow.png)
+
 ## Tech stack:
 
 * **Django:** As the Backend Framework for defining the api endpoints for the REST server, configuring the REST server, Websocket server and the gRPC server for startup logic and graceful shutdown, setting variables for the RabbitMQ email worker to use and starting all three servers via the addition of uvicorn server
@@ -96,8 +102,28 @@
 * **Deploying with Helm:**
   ```bash
   cd voice-ai-chart
-  helm upgrade --install voice-ai ./
+  helm dependency build
+  helm upgrade --install voice-ai ./ --namespace voice-ai --create-namespace
+  ```
 
  ## Important Clarification
 
  As the XTTS model is heavy and resource intensive use on-premise GPU or a GPU based cloud VM instance such as the EC2 `g4dn.xlarge` instance or equivilant to another alternative cloud provider VM service
+
+## Infrastructure Architecture:
+
+The whole stack runs on a single GPU VM (EC2 `g4dn.xlarge` or equivilant) with MicroK8s and is packaged with Helm into a dedicated `voice-ai` namespace. The diagram below shows the infra level layout -> the Kubernetes namespaces, the services with their service host and port, the persistent volumes for the models and the GPU time-slicing driven by the NVIDIA Helm chart:
+
+![Infrastructure Architecture](docs/infra-architecture.png)
+
+* **Kubernetes namespace:** everything is installed into a seperate `voice-ai` namespace via `--namespace voice-ai --create-namespace` so the app and the infra pods stay isolated in one release
+
+* **Services (service host : port):** the pods talk to each other over ClusterIP services by name -> `voice-ai:8000` (web REST + WebSocket), `voice-ai-grpc:50051` (STT), `voice-ai-pgbouncer:6432` (pooler), `voice-ai-postgresql:5432`, `voice-ai-redis-master:6379` and `voice-ai-rabbitmq:5672`
+
+* **Persistent Volumes:** the `whisper-model-pvc` and `xtts-model-pvc` PVCs persist the STT and TTS model weights so the gRPC and TTS pods dont re-download the heavy models on every restart
+
+* **GPU time-slicing:** the NVIDIA GPU Operator is installed via its Helm chart and applies the `time-slicing-config` so the single physical GPU is advertised as multiple vGPU slices -> the STT (gRPC) and TTS pods each request `nvidia.com/gpu: 1` and share the one physical GPU instead of needing a card each
+
+* **PgBouncer:** the app never connects to Postgres directly, the live DB connections are pooled through the `voice-ai-pgbouncer` service which then talks to the upstream `voice-ai-postgresql` on `:5432`
+
+* **Observability:** the pods export OTLP telemetry to the OpenTelemetry Collector which fans it out by signal -> logs to Loki, traces to Tempo and metrics to Prometheus/Thanos. Each backend persists to its own S3 bucket (`voice-ai-loki`, `voice-ai-tempo`, `voice-ai-thanos`) and Grafana is used to query and visualize all three
