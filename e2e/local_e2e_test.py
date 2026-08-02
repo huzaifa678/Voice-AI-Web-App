@@ -7,7 +7,6 @@ import pytest
 import httpx
 from websockets.asyncio.client import connect
 import soundfile as sf
-import logging
 from app.common.logger import get_logger
 
 logger = get_logger(__name__)
