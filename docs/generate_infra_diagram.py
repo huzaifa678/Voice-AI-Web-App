@@ -2,7 +2,6 @@
 Run from repo root:  ./venv/bin/python docs/generate_infra_diagram.py
 """
 from diagrams import Diagram, Cluster, Edge
-from diagrams.aws.compute import EC2
 from diagrams.k8s.compute import Pod, StatefulSet
 from diagrams.k8s.network import Service, Ingress
 from diagrams.k8s.storage import PV
