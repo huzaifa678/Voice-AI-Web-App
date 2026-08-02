@@ -43,9 +43,8 @@ async def test_stream_transcribe_success():
     servicer = AudioServicer()
 
     with patch(
-        "app.grpc.service.VADService.is_speech", return_value=True
-    ) as mock_vad, patch(
         "app.grpc.service.AudioService.transcribe_pcm",
+        new_callable=AsyncMock,
         return_value="hello world",
     ) as mock_transcribe, patch(
         "app.grpc.service.publish_audio_task", new_callable=AsyncMock
@@ -57,14 +56,17 @@ async def test_stream_transcribe_success():
             yield DummyRequest(SAMPLE_AUDIO_BYTES)
 
         context = DummyContext()
-        response = await servicer.StreamTranscribe(request_gen(), context)
+        responses = [
+            resp
+            async for resp in servicer.StreamTranscribe(request_gen(), context)
+        ]
 
-        assert isinstance(response, audio_pb2.TranscriptionResponse)
-        assert response.transcript == "hello world"
-        assert mock_vad.call_count == 1
+        # StreamTranscribe streams one response per transcribed chunk
+        assert len(responses) == 1
+        assert isinstance(responses[0], audio_pb2.TranscriptionResponse)
+        assert responses[0].transcript == "hello world"
         mock_transcribe.assert_called_once_with(SAMPLE_AUDIO_BYTES, 16000)
         # publish_audio_task is fire-and-forget via asyncio.create_task
-        # Allow the event loop to process the created task
         await asyncio.sleep(0)
         mock_publish.assert_called_once()
         assert context.code is None
@@ -80,36 +82,11 @@ async def test_stream_transcribe_no_audio():
             yield
 
     context = DummyContext()
-    response = await servicer.StreamTranscribe(empty_request_gen(), context)
+    responses = [
+        resp
+        async for resp in servicer.StreamTranscribe(empty_request_gen(), context)
+    ]
 
-    assert isinstance(response, audio_pb2.TranscriptionResponse)
-    assert response.transcript == ""
+    assert responses == []
     assert context.code == grpc.StatusCode.INVALID_ARGUMENT
     assert context.details == "No audio received"
-
-
-@pytest.mark.asyncio
-async def test_stream_transcribe_vad_blocks_short_audio():
-    """
-    When VAD returns False, transcription is skipped even if audio is present.
-    """
-    servicer = AudioServicer()
-
-    with patch(
-        "app.grpc.service.VADService.is_speech", return_value=False
-    ), patch(
-        "app.grpc.service.AudioService.transcribe_pcm"
-    ) as mock_transcribe, patch(
-        "app.grpc.service.publish_audio_task", new_callable=AsyncMock
-    ), patch(
-        "app.grpc.service.rate_limit", return_value=None
-    ):
-
-        async def request_gen():
-            yield DummyRequest(SAMPLE_AUDIO_BYTES)
-
-        context = DummyContext()
-        response = await servicer.StreamTranscribe(request_gen(), context)
-
-        assert response.transcript == ""
-        mock_transcribe.assert_not_called()

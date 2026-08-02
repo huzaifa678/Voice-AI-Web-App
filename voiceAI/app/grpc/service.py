@@ -1,6 +1,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import os
+import grpc
 from app.audio.services import AudioService
 from app.common.rabbit_mq import publish_audio_task
 from app.common.rate_limit import rate_limit
@@ -69,6 +70,11 @@ class AudioServicer(
                         )
 
                     await asyncio.sleep(0)
+
+                if not audio_chunks:
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    context.set_details("No audio received")
+                    return
 
                 final_transcript = " ".join(
                     transcript_parts

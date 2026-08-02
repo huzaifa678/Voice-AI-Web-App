@@ -126,3 +126,28 @@ async def test_disconnect_cleanup():
     assert len(consumer.session.prob_history) == 0
     assert len(consumer.vad_frame_buffer) == 0
     grpc_channel.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_transcribe_audio_bytes_vad_blocks_non_speech():
+    """VAD gating now lives in the AudioService layer: when Silero VAD reports
+    no speech, transcribe_audio_bytes raises and never calls the STT model."""
+    import numpy as np
+    from app.audio.services import transcribe_audio_bytes
+
+    with patch(
+        "app.audio.services.AudioService.save_audio_to_wav",
+        return_value="/tmp/does-not-exist.wav",
+    ), patch(
+        "soundfile.read",
+        return_value=(np.zeros(1600, dtype=np.int16), 16000),
+    ), patch(
+        "app.audio.services.VADService.is_speech", return_value=False
+    ), patch(
+        "app.audio.services.AudioService.transcribe_pcm", new_callable=AsyncMock
+    ) as mock_transcribe:
+
+        with pytest.raises(ValueError, match="No speech detected"):
+            await transcribe_audio_bytes(b"\x01\x02" * 100, "user-1")
+
+        mock_transcribe.assert_not_called()
