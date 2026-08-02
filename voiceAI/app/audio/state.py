@@ -9,4 +9,3 @@ class VoiceState(str, Enum):
     SPEAKING = "SPEAKING"
     INTERRUPTED = "INTERRUPTED"
     DISCONNECTED = "DISCONNECTED"
-    

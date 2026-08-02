@@ -82,7 +82,6 @@ class AudioService:
         audio_bytes: bytes,
         format: str = "webm"
     ) -> str:
-
         """
         Converts audio bytes into 16khz mono wav.
         """
@@ -92,12 +91,10 @@ class AudioService:
             delete=False
         ) as tmp:
 
-
             audio = AudioSegment.from_file(
                 io.BytesIO(audio_bytes),
                 format=format
             )
-
 
             audio = (
                 audio
@@ -105,12 +102,10 @@ class AudioService:
                 .set_frame_rate(16000)
             )
 
-
             audio.export(
                 tmp.name,
                 format="wav"
             )
-
 
             return tmp.name
 
@@ -142,7 +137,6 @@ class AudioService:
         audio: np.ndarray,
         sample_rate: int = 16000
     ):
-
         """
         Sends numpy audio chunk to SimulStreaming.
         """
@@ -162,10 +156,8 @@ class AudioService:
 
         if not transcript:
             return ""
-        
+
         return transcript
-
-
 
     @classmethod
     async def transcribe_pcm(
@@ -174,7 +166,6 @@ class AudioService:
         sample_rate: int = 16000,
         timeout: float = 30.0
     ):
-
         """
         gRPC streaming entrypoint.
 
@@ -182,7 +173,6 @@ class AudioService:
         converts to float32,
         sends to SimulStreaming.
         """
-
 
         audio = (
             np.frombuffer(
@@ -194,9 +184,7 @@ class AudioService:
             32768.0
         )
 
-
         loop = asyncio.get_running_loop()
-
 
         try:
 
@@ -238,8 +226,6 @@ class AudioService:
 
             return ""
 
-
-
     @staticmethod
     def verify_phrase(
         text: str,
@@ -251,8 +237,6 @@ class AudioService:
             in
             text.lower()
         )
-
-
 
     @classmethod
     async def process_audio(

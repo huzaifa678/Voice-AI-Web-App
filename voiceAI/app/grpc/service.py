@@ -1,8 +1,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import os
-import numpy as np
-from app.audio.services import AudioService, VADService
+from app.audio.services import AudioService
 from app.common.rabbit_mq import publish_audio_task
 from app.common.rate_limit import rate_limit
 from app.common.logger import get_logger
@@ -20,6 +19,7 @@ logger = get_logger(__name__)
 tracer = tracer(__name__)
 
 ROLLING_BUFFER_MIN_BYTES = int(16000 * 2 * 2)
+
 
 class AudioServicer(
     service_pb2_grpc.AudioServiceServicer
@@ -68,7 +68,6 @@ class AudioServicer(
                             transcript=transcript
                         )
 
-
                     await asyncio.sleep(0)
 
                 final_transcript = " ".join(
@@ -96,7 +95,6 @@ class AudioServicer(
         self,
         audio_bytes
     ):
-
         """
         Process one PCM chunk.
 
@@ -124,7 +122,6 @@ class AudioServicer(
                 )
 
                 return ""
-        
 
     async def _finalize_session(
         self,
@@ -132,7 +129,6 @@ class AudioServicer(
         audio_chunks,
         transcript
     ):
-
         """
         Same optimization path:
         - DB async
@@ -196,7 +192,7 @@ class AudioServicer(
             )
 
             try:
-                
+
                 await loop.run_in_executor(
                     None,
                     lambda: AudioSession.objects.filter(
@@ -233,4 +229,3 @@ class AudioServicer(
                 logger.exception(
                     "Session finalization failed"
                 )
-            

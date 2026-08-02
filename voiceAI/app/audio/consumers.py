@@ -289,7 +289,11 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
                 await self.emit_event(VoiceState.THINKING, {"transcript": transcript})
 
                 self.session.metrics.websocket_sent = VoiceMetrics.now()
-                self.session.metrics.observe("stt_roundtrip", self.session.metrics.session_started, self.session.metrics.websocket_sent)
+                self.session.metrics.observe(
+                    "stt_roundtrip",
+                    self.session.metrics.session_started,
+                    self.session.metrics.websocket_sent,
+                )
                 await self.send(text_data=json.dumps(response))
                 await self.log("called the grpc method successfully")
 

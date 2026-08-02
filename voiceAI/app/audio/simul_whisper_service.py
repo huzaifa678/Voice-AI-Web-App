@@ -36,15 +36,12 @@ class SimulWhisperService:
                 "[SimulWhisper] Loading model..."
             )
 
-            from faster_whisper import WhisperModel
-
             if ENVIRONMENT == "local":
                 model_path = os.path.expanduser(
                     "~/.cache/whisper/base.pt"
                 )
             else:
                 model_path = cls.MODEL_PATH
-
 
             args = SimpleNamespace(
                 log_level=logging.INFO,
@@ -65,7 +62,6 @@ class SimulWhisperService:
                 logdir=None,
             )
 
-
             cls._asr, cls._online = (
                 simul_asr_factory(
                     args
@@ -77,7 +73,6 @@ class SimulWhisperService:
             )
 
         return cls._online
-
 
     @classmethod
     def transcribe_chunk(
@@ -106,10 +101,8 @@ class SimulWhisperService:
             ""
         )
 
-
     @classmethod
     def finish(cls):
-
         """
         Flush remaining buffered audio.
         Called when stream closes.
@@ -128,4 +121,3 @@ class SimulWhisperService:
             "text",
             ""
         )
-    

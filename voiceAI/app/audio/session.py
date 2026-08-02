@@ -36,7 +36,6 @@ class VoiceSession:
 
     warmup_frames: int = 5
 
-
     interruption_event: asyncio.Event = field(
         default_factory=asyncio.Event
     )
@@ -44,7 +43,6 @@ class VoiceSession:
     is_playing_audio: bool = False
 
     current_tts_task: asyncio.Task | None = None
-
 
     transcript: str = ""
 
@@ -55,7 +53,6 @@ class VoiceSession:
         state: VoiceState
     ):
         self.state = state
-
 
     def interrupt(self):
         """
@@ -69,10 +66,8 @@ class VoiceSession:
 
         self.interruption_event.set()
 
-
         if self.current_tts_task:
             self.current_tts_task.cancel()
-
 
     def reset_interrupt(self):
         self.interruption_event.clear()
