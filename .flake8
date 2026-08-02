@@ -5,6 +5,8 @@ exclude =
     .git,
     __pycache__,
     node_modules,
+    SimulStreaming,
+    simulstreaming-env,
     */migrations/*,
     voiceAI/app/grpc/*_pb2.py,
     voiceAI/app/grpc/*_pb2_grpc.py,
