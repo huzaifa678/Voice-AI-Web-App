@@ -1,6 +1,7 @@
 import logging
-import os
 import sys
+
+from app.common.config import config
 
 _logging_configured = False
 
@@ -23,7 +24,7 @@ def setup_logging() -> None:
         handler.setFormatter(formatter)
         root.addHandler(handler)
 
-    log_file = os.getenv("LOG_FILE")
+    log_file = config.LOG_FILE
     if log_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setFormatter(formatter)
