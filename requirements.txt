@@ -26,6 +26,7 @@ scipy>=1.17,<1.18
 aio_pika==9.6.2
 grpcio
 grpcio-tools
+tiktoken
 opentelemetry-api
 opentelemetry-sdk
 opentelemetry-exporter-otlp
