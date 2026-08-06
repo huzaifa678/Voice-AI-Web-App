@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from app.common.config import config
 from simulstreaming.whisper_factory import (
     simul_asr_factory,
 )
@@ -11,10 +12,7 @@ from simulstreaming.whisper_factory import (
 
 logger = logging.getLogger(__name__)
 
-ENVIRONMENT = os.getenv(
-    "ENVIRONMENT",
-    "local"
-)
+ENVIRONMENT = config.ENVIRONMENT
 
 
 class SimulWhisperService:
@@ -22,9 +20,8 @@ class SimulWhisperService:
     _asr = None
     _online = None
 
-    MODEL_PATH = os.getenv(
-        "WHISPER_MODEL_PATH",
-        "/app/models/whisper/large-v3.pt"
+    MODEL_PATH = (
+        config.WHISPER_MODEL_PATH or config.WHISPER_MODEL_PATH_DEFAULT_REMOTE
     )
 
     @classmethod
@@ -38,7 +35,8 @@ class SimulWhisperService:
 
             if ENVIRONMENT == "local":
                 model_path = os.path.expanduser(
-                    "~/.cache/whisper/base.pt"
+                    config.WHISPER_MODEL_PATH
+                    or config.WHISPER_MODEL_PATH_DEFAULT_LOCAL
                 )
             else:
                 model_path = cls.MODEL_PATH
@@ -58,7 +56,7 @@ class SimulWhisperService:
                 static_init_prompt=None,
                 max_context_tokens=None,
                 lan="en",
-                min_chunk_size=1.0,
+                min_chunk_size=config.WHISPER_MIN_CHUNK,
                 logdir=None,
             )
 
