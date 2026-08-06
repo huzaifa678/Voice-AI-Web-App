@@ -1,12 +1,15 @@
 import os
 from celery import Celery
 
+from app.common.config import config
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
 
-BROKER_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672//")
-RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-
-celery_app = Celery("voiceAI", broker=BROKER_URL, backend=RESULT_BACKEND)
+celery_app = Celery(
+    "voiceAI",
+    broker=config.CELERY_BROKER_URL,
+    backend=config.CELERY_RESULT_BACKEND,
+)
 
 celery_app.config_from_object("django.conf:settings", namespace="CELERY")
 
