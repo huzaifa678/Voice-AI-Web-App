@@ -1,7 +1,7 @@
 import json
 import pika
-import os
 import aio_pika
+from app.common.config import config
 from app.common.telemetry import SpanKind, current_trace_headers, record_exception, tracer
 
 tracer = tracer(__name__)
@@ -11,8 +11,6 @@ _rmq_connection = None
 _connection = None
 _channel = None
 
-RABBITMQ_URL = os.getenv("RABBITMQ_URL") or os.getenv("CELERY_BROKER_URL")
-
 
 def get_channel():
     global _connection, _channel
@@ -20,7 +18,7 @@ def get_channel():
     if _connection and _connection.is_open:
         return _channel, _connection
 
-    params = pika.URLParameters(RABBITMQ_URL)
+    params = pika.URLParameters(config.RABBITMQ_URL)
     _connection = pika.BlockingConnection(params)
     _channel = _connection.channel()
     return _channel, _connection
@@ -40,7 +38,7 @@ async def get_connection():
     if _rmq_connection and not _rmq_connection.is_closed:
         return _rmq_connection
 
-    _rmq_connection = await aio_pika.connect_robust(os.getenv("RABBITMQ_URL"))
+    _rmq_connection = await aio_pika.connect_robust(config.RABBITMQ_URL)
     return _rmq_connection
 
 
@@ -132,14 +130,6 @@ async def publish_audio_response(
         finally:
             if channel is not None:
                 await channel.close()
-
-
-async def publish_email_task(email_data: dict):
-    """Publish an email task into the Celery queue."""
-
-    from app.workers.task_email import send_welcome_email
-
-    send_welcome_email.delay(email_data)
 
 
 def close_connection():
