@@ -37,6 +37,11 @@ volumeClaim:
 image:
   repository: huzaifagill234/voice-ai-web
   tag: ci-v1.0.1
+
+groq:
+  existingSecret: ""
+  secretKey: GROQ_API_KEY
+  apiKey: ""
   imagePullPolicy: Always
 
 e2e:
