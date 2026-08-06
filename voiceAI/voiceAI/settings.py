@@ -10,11 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
-import os
 from pathlib import Path
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.common.config import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,7 +27,7 @@ SECRET_KEY = "django-insecure-&j*0*buq9ex!mezwm(cr6&hx6u_5ye&g0_4ah132jqxx@$mo59
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
+ALLOWED_HOSTS = config.ALLOWED_HOSTS
 
 # ALLOWED_HOSTS = [
 #     "localhost",
@@ -84,9 +82,9 @@ EMAIL_HOST = "smtp.gmail.com"
 
 EMAIL_PORT = 587
 
-EMAIL_HOST_USER = os.getenv("GOOGLE_USER_EMAIL", "")
+EMAIL_HOST_USER = config.GOOGLE_USER_EMAIL
 
-EMAIL_HOST_PASSWORD = os.getenv("GOOGLE_APP_PASSWORD", "")
+EMAIL_HOST_PASSWORD = config.GOOGLE_APP_PASSWORD
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
@@ -136,15 +134,15 @@ DATABASES = {
         "NAME": "voice_ai_db",
         "USER": "postgres",
         "PASSWORD": "postgres",
-        "HOST": os.getenv("POSTGRES_HOST", "pgbouncer"),
-        "PORT": os.getenv("POSTGRES_PORT", 6432),
+        "HOST": config.POSTGRES_HOST,
+        "PORT": config.POSTGRES_PORT,
         "CONN_MAX_AGE": 0,
     }
 }
 
 
-IS_TEST = os.getenv("DJANGO_TEST") == "true"
-IS_CI = os.getenv("CI") == "true"
+IS_TEST = config.DJANGO_TEST
+IS_CI = config.IS_CI
 
 
 if IS_TEST or IS_CI:
@@ -162,7 +160,7 @@ if IS_TEST or IS_CI:
     EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 # for running tests in the local environment
-if os.environ.get("DJANGO_TEST") == "true":
+if config.DJANGO_TEST:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
