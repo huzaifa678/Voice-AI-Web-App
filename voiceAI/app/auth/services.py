@@ -1,24 +1,21 @@
-import os
 import secrets
 from django.utils import timezone
 from tokenize import TokenError
-from dotenv import load_dotenv
 from rest_framework_simplejwt.tokens import AccessToken
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+from app.common.config import config
 from app.common.jwt import generate_token
 from app.common.rate_limit import rate_limit
 from app.common.utils import parse_timedelta
 from app.common.logger import get_logger
 from app.models import RefreshToken
 
-load_dotenv()
-
 User = get_user_model()
 
-REFRESH_TOKEN_LIFETIME = parse_timedelta(os.getenv("REFRESH_TOKEN_LIFETIME", "7d"))
+REFRESH_TOKEN_LIFETIME = parse_timedelta(config.REFRESH_TOKEN_LIFETIME)
 
 logger = get_logger(__name__)
 
