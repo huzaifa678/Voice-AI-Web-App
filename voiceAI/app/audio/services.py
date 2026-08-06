@@ -14,8 +14,6 @@ from app.audio.simul_whisper_service import SimulWhisperService
 logger = get_logger(__name__)
 tracer = tracer(__name__)
 
-ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
-
 executor = ThreadPoolExecutor(max_workers=2)
 
 
