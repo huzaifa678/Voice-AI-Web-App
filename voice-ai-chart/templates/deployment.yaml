@@ -125,7 +125,6 @@ spec:
           - "sh"
           - "-c"
           - >
-            export GROQ_API_KEY=$(grep '^GROQ_API_KEY=' /app/.env.docker | cut -d '=' -f2) &&
             ./wait-for-it.sh {{ .Values.env.RABBITMQ_HOST }}:5672 --strict --timeout=120 &&
             python -m app.workers.task_audio
           env:
@@ -135,6 +134,11 @@ spec:
               value: {{ $value | quote }}
             {{- end }}
             {{- end }}
+            - name: {{ .Values.groq.secretKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "voice-ai.groqSecretName" . }}
+                  key: {{ .Values.groq.secretKey }}
       restartPolicy: Always
 ---
 apiVersion: apps/v1
@@ -162,7 +166,6 @@ spec:
             - "sh"
             - "-c"
             - >
-              export GROQ_API_KEY=$(grep '^GROQ_API_KEY=' /app/.env.docker | cut -d '=' -f2) &&
               ./wait-for-it.sh {{ .Values.env.RABBITMQ_HOST }}:5672 --strict --timeout=120 &&
               python -m app.workers.task_tts
           env:
@@ -172,6 +175,11 @@ spec:
               value: {{ $value | quote }}
             {{- end }}
             {{- end }}
+            - name: {{ .Values.groq.secretKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "voice-ai.groqSecretName" . }}
+                  key: {{ .Values.groq.secretKey }}
           volumeMounts:
             - name: xtts-model
               mountPath: /app/models/xtts
