@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 import aio_pika
 from app.llm.services import LLMService
 from app.common.rabbit_mq import get_connection, publish_audio_response
@@ -10,8 +9,6 @@ from app.common.telemetry import context_from_metadata, current_trace_headers, r
 setup_telemetry("voice-ai-audio-worker")
 logger = get_logger(__name__)
 tracer = tracer(__name__)
-
-ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
 
 async def handle_message(message: aio_pika.IncomingMessage):
