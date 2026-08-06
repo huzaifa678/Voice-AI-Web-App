@@ -1,20 +1,21 @@
 import asyncio
 import base64
 import json
-import os
 import time
 import aio_pika
+from app.common.config import config
 from app.common.rabbit_mq import get_connection, publish_audio_response
 from app.common.logger import get_logger
 from app.audio.metrics import VoiceMetrics
 from app.common.telemetry import context_from_metadata, record_exception, setup_telemetry, tracer
-from app.tts.services import TTSService
+from app.tts.providers import get_tts_provider
 
 setup_telemetry("voice-ai-tts-worker")
 logger = get_logger(__name__)
 tracer = tracer(__name__)
 
-ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
+ENVIRONMENT = config.ENVIRONMENT
+tts_provider = get_tts_provider()
 
 
 async def handle_tts_message(message: aio_pika.IncomingMessage):
@@ -33,7 +34,7 @@ async def handle_tts_message(message: aio_pika.IncomingMessage):
 
             start_time = time.time()  # start timer
             # Synthesize audio in a thread (blocks TTS CPU/GPU work here)
-            audio_bytes = await asyncio.to_thread(TTSService.synthesize, text)
+            audio_bytes = await asyncio.to_thread(tts_provider.synthesize, text)
             end_time = time.time()  # end timer
             VoiceMetrics.observe("tts", start_time, end_time)
             span.set_attribute("voice.tts.audio_bytes", len(audio_bytes))
@@ -68,9 +69,13 @@ async def main():
     queue = await channel.declare_queue("tts_tasks", durable=True)
 
     if ENVIRONMENT != "local":
-        logger.info("[*] Loading XTTS Model into GPU...")
-        await asyncio.to_thread(TTSService.load_model, async_load=False)
-        logger.info("[*] Model Loaded. Starting consumer.")
+        logger.info("[*] Loading TTS model...")
+        await asyncio.to_thread(tts_provider.load)
+        logger.info("[*] TTS model loaded. Starting consumer.")
+    else:
+        logger.info("[*] Loading TTS model...")
+        await asyncio.to_thread(tts_provider.load)
+        logger.info("[*] TTS model loaded. Starting consumer.")
 
     await queue.consume(handle_tts_message)
     logger.info("[*] Waiting for TTS tasks")
