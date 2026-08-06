@@ -1,7 +1,7 @@
 import logging
-import os
 from typing import Iterable
 
+from app.common.config import config
 from opentelemetry import propagate, trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.celery import CeleryInstrumentor
@@ -35,30 +35,30 @@ def setup_telemetry(service_name: str | None = None) -> None:
     if _configured:
         return
 
-    if os.getenv("OTEL_SDK_DISABLED", "false").lower() == "true":
+    if config.OTEL_SDK_DISABLED:
         _configured = True
         return
 
-    service = service_name or os.getenv("OTEL_SERVICE_NAME", "voice-ai-backend")
+    service = service_name or config.OTEL_SERVICE_NAME
     resource = Resource.create(
         {
             SERVICE_NAME: service,
-            SERVICE_VERSION: os.getenv("APP_VERSION", "latest"),
-            DEPLOYMENT_ENVIRONMENT: os.getenv("ENVIRONMENT", "local"),
+            SERVICE_VERSION: config.APP_VERSION,
+            DEPLOYMENT_ENVIRONMENT: config.ENVIRONMENT,
         }
     )
 
     provider = TracerProvider(resource=resource)
     trace.set_tracer_provider(provider)
 
-    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317")
+    endpoint = config.OTEL_EXPORTER_OTLP_ENDPOINT
     provider.add_span_processor(
         BatchSpanProcessor(
             OTLPSpanExporter(endpoint=endpoint, insecure=True)
         )
     )
 
-    if os.getenv("OTEL_CONSOLE_EXPORTER", "false").lower() == "true":
+    if config.OTEL_CONSOLE_EXPORTER:
         provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
 
     DjangoInstrumentor().instrument()
