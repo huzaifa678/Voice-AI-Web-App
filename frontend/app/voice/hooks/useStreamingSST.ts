@@ -6,14 +6,26 @@ import { setCredentials } from "@redux/authSlice";
 import { refreshAccessToken } from "@/api/auth/refresh.route";
 import { jwtDecode } from "jwt-decode";
 
-export type LLMResponse = {
-  llmResponse?: string;
-  audioBase64?: string;
-};
+function playAudioBase64(base64: string) {
+  try {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    audio.onerror = () => URL.revokeObjectURL(url);
+    audio.play().catch((err) => console.error("TTS audio playback failed", err));
+  } catch (err) {
+    console.error("Failed to decode TTS audio", err);
+  }
+}
 
 export function useStreamingSST(wsUrl: string, token?: string) {
   const [transcript, setTranscript] = useState("");
-  const [llmResponse, setLlmResponse] = useState<LLMResponse | null>(null);
+  const [answer, setAnswer] = useState("");
 
   const recorder = useRecorder((pcmBuffer) => {
     ws.send(pcmBuffer);
@@ -22,22 +34,17 @@ export function useStreamingSST(wsUrl: string, token?: string) {
   const ws = useWebSocket(wsUrl, recorder, (event) => {
     const data = JSON.parse(event.data);
 
-    console.log("WS MESSAGE:", data);
-
-    // if ("transcript" in data) {
-    //   console.log("TRANSCRIPT:", data.transcript);
-    // }
-
     if (data.transcript) {
-      console.log("TRANSCRIPT:", data.transcript);
       setTranscript(data.transcript);
+      setAnswer("");
     }
 
-    if (data.llmResponse || data.audioBase64) {
-      setLlmResponse({
-        llmResponse: data.llmResponse,
-        audioBase64: data.audioBase64,
-      });
+    if (data.llmResponse) {
+      setAnswer(data.llmResponse);
+    }
+
+    if (data.audioBase64) {
+      playAudioBase64(data.audioBase64);
     }
   });
 
@@ -54,7 +61,7 @@ export function useStreamingSST(wsUrl: string, token?: string) {
 
   const start = async () => {
     setTranscript("");
-    setLlmResponse(null);
+    setAnswer("");
 
     let access = token ?? store.getState().auth.accessToken;
     const refresh = localStorage.getItem("refresh-token");
@@ -94,7 +101,7 @@ export function useStreamingSST(wsUrl: string, token?: string) {
     start,
     stop,
     transcript,
-    llmResponse,
+    answer,
     analyser: recorder.analyser,
   };
 }

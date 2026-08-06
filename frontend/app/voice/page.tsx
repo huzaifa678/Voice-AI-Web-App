@@ -23,7 +23,7 @@ export default function StreamingPage() {
     start,
     stop,
     transcript,
-    llmResponse,
+    answer,
     analyser,
   } = useStreamingSST(
     "ws://localhost:8000/ws/audio/",
@@ -83,7 +83,7 @@ export default function StreamingPage() {
         </div>
       )}
 
-      {llmResponse && (
+      {answer && (
         <div className="w-full max-w-3xl rounded-xl border border-green-200 bg-green-50 p-5 shadow">
           <div className="mb-3 flex items-center gap-2">
             <span className="text-xl">🤖</span>
@@ -94,7 +94,7 @@ export default function StreamingPage() {
 
           <div className="prose prose-slate max-w-none overflow-x-auto">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {llmResponse.llmResponse ?? ""}
+              {answer}
             </ReactMarkdown>
           </div>
         </div>
