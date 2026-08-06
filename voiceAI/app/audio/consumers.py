@@ -1,5 +1,4 @@
 import asyncio
-import os
 import time
 import json
 import grpc
@@ -8,6 +7,7 @@ import aio_pika
 from collections import deque
 from channels.generic.websocket import AsyncWebsocketConsumer
 
+from app.common.config import config
 from app.audio.services import VADService
 from app.common.logger import get_logger
 from app.common.rate_limit import rate_limit
@@ -33,6 +33,7 @@ FRAME_SAMPLES = 512
 HOP_SAMPLES = 512
 
 SPEECH_START_PROB = 0.20
+VAD_DEBUG = config.VAD_DEBUG
 SPEECH_END_PROB = 0.10
 
 SILENCE_TIMEOUT = 0.4
@@ -106,9 +107,7 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
         # Persistent gRPC channel created once per WebSocket connection.
         # Reused for every transcription request to avoid per-utterance
         # TCP + HTTP/2 handshake overhead.
-        self._grpc_target = os.getenv(
-            "GRPC_DEPLOYMENT_TYPE", "local"
-        ).lower()
+        self._grpc_target = config.GRPC_DEPLOYMENT_TYPE
         if self._grpc_target == "remote":
             self._grpc_host = "voice-ai-grpc:50051"
         else:
@@ -179,12 +178,13 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
                 prob if not self.session.in_speech else float(np.mean(self.session.prob_history))
             )
 
-            await self.log(
-                f"[VAD] rms={rms:.4f} "
-                f"prob={prob:.3f} "
-                f"smooth={smooth_prob:.3f} "
-                f"in_speech={self.session.in_speech}"
-            )
+            if VAD_DEBUG:
+                await self.log(
+                    f"[VAD] rms={rms:.4f} "
+                    f"prob={prob:.3f} "
+                    f"smooth={smooth_prob:.3f} "
+                    f"in_speech={self.session.in_speech}"
+                )
 
             if not self.session.in_speech and smooth_prob > SPEECH_START_PROB:
 
@@ -269,7 +269,7 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
             },
         ) as span:
             try:
-                grpc_type = os.getenv("GRPC_DEPLOYMENT_TYPE", "local").lower()
+                grpc_type = config.GRPC_DEPLOYMENT_TYPE
                 self.session.state = (VoiceState.TRANSCRIBING)
                 self.session.metrics.stt_started = (VoiceMetrics.now())
                 if grpc_type == "remote":
