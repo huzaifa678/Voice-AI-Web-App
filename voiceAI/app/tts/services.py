@@ -1,13 +1,13 @@
+from abc import ABC, abstractmethod
 import io
 import os
 import re
 import threading
+import wave
 import numpy as np
 import torch
 import soundfile as sf
-from TTS.api import TTS
-from TTS.tts.configs.xtts_config import XttsArgs, XttsAudioConfig, XttsConfig
-from TTS.config.shared_configs import BaseDatasetConfig
+from app.common.config import config
 from app.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -18,14 +18,33 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
-XTTS_MODEL_NAME = "tts_models/multilingual/multi-dataset/xtts_v2"
 XTTS_PATH = "/app/models/xtts/tts_models--multilingual--multi-dataset--xtts_v2"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SPEAKER_WAV = os.path.join(BASE_DIR, "speaker.wav")
 
+_REPO_ROOT = os.path.dirname(
+    os.path.dirname(
+        os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__))
+        )
+    )
+)
+DEFAULT_PIPER_MODEL = os.path.join(
+    _REPO_ROOT, "models", "piper", "en_US-lessac-medium.onnx"
+)
 
-class TTSService:
+
+class BaseTTSService(ABC):
+    @abstractmethod
+    def load(self) -> None:
+        ...
+
+    @abstractmethod
+    def synthesize(self, text: str) -> bytes:
+        ...
+
+
+class TTSService(BaseTTSService):
     _tts_model = None
     _speaker_embedding = None
     _gpt_cond_latent = None
@@ -33,24 +52,25 @@ class TTSService:
 
     @staticmethod
     def _load_model_sync():
+        from TTS.api import TTS
+        from TTS.tts.configs.xtts_config import (
+            XttsArgs,
+            XttsAudioConfig,
+            XttsConfig,
+        )
+        from TTS.config.shared_configs import BaseDatasetConfig
+
         torch.serialization.add_safe_globals(
             [XttsConfig, XttsAudioConfig, BaseDatasetConfig, XttsArgs]
         )
         os.environ["COQUI_TOS_AGREED"] = "1"
 
-        if ENVIRONMENT == "local":
-            TTSService._tts_model = TTS(
-                model_name=XTTS_MODEL_NAME,
-                progress_bar=False,
-                gpu=torch.cuda.is_available(),
-            )
-        else:
-            TTSService._tts_model = TTS(
-                model_path=XTTS_PATH,
-                config_path=f"{XTTS_PATH}/config.json",
-                progress_bar=False,
-                gpu=torch.cuda.is_available(),
-            )
+        TTSService._tts_model = TTS(
+            model_path=XTTS_PATH,
+            config_path=f"{XTTS_PATH}/config.json",
+            progress_bar=False,
+            gpu=torch.cuda.is_available(),
+        )
 
         model = TTSService._tts_model.synthesizer.tts_model.to(DEVICE)
 
@@ -83,7 +103,11 @@ class TTSService:
                 return TTSService._tts_model
 
     @staticmethod
-    def chunk_text(text, max_chars=200):
+    def load():
+        TTSService.load_model(async_load=False)
+
+    @staticmethod
+    def chunk_text(text, max_chars=120):
         words = text.split()
         chunks = []
         current = []
@@ -116,13 +140,21 @@ class TTSService:
             if not chunk.strip():
                 continue
 
-            with torch.inference_mode():
-                result = model.inference(
-                    chunk,
-                    language,
-                    TTSService._gpt_cond_latent,
-                    TTSService._speaker_embedding,
+            try:
+                with torch.inference_mode():
+                    result = model.inference(
+                        chunk,
+                        language,
+                        TTSService._gpt_cond_latent,
+                        TTSService._speaker_embedding,
+                    )
+            except (IndexError, RuntimeError) as exc:
+                logger.warning(
+                    "XTTS inference failed for chunk (%d chars), skipping: %s",
+                    len(chunk),
+                    exc,
                 )
+                continue
 
             wav = result["wav"]
             if isinstance(wav, torch.Tensor):
@@ -142,3 +174,27 @@ class TTSService:
         buffer.seek(0)
         logger.info("SYNTHESIZE DONE")
         return buffer.read()
+
+
+class PiperTTSService(BaseTTSService):
+    _voice = None
+    MODEL_PATH = config.PIPER_MODEL_PATH or DEFAULT_PIPER_MODEL
+
+    @classmethod
+    def load(cls):
+        if cls._voice is not None:
+            return
+
+        from piper import PiperVoice
+
+        logger.info("[Piper] loading voice: %s", cls.MODEL_PATH)
+        cls._voice = PiperVoice.load(cls.MODEL_PATH)
+
+    @classmethod
+    def synthesize(cls, text: str) -> bytes:
+        cls.load()
+
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as wav_file:
+            cls._voice.synthesize_wav(text, wav_file)
+        return buffer.getvalue()
