@@ -29,3 +29,11 @@ voice-ai-tts-worker
 {{- define "voice-ai-tts-worker.name" -}}
 voice-ai-tts-worker
 {{- end }}
+
+{{- define "voice-ai.groqSecretName" -}}
+{{- if .Values.groq.existingSecret -}}
+{{- .Values.groq.existingSecret -}}
+{{- else -}}
+{{- printf "%s-groq" (include "voice-ai.fullname" .) -}}
+{{- end -}}
+{{- end }}
