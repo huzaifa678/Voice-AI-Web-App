@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from app.serializers.register_serializer import RegisterSerializer
 from app.serializers.login_serializer import LoginSerializer
 from app.serializers.refresh_serializer import RefreshSerializer
-from app.common.rabbit_mq import publish_email_task
+from app.workers.dispatch import publish_email_task
 from app.common.logger import get_logger
 from .services import AuthService
 

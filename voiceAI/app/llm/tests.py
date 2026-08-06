@@ -1,23 +1,26 @@
-import pytest
 import httpx
+import pytest
 from unittest.mock import AsyncMock, patch
+
 from app.llm.services import LLMService
+
+ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
 
 
 @pytest.mark.asyncio
 async def test_query_from_text_no_api_key(monkeypatch):
-    monkeypatch.setattr(LLMService, "API_KEY", None)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
-    with pytest.raises(RuntimeError, match="GROQ_API_KEY is not set"):
+    with pytest.raises(RuntimeError, match="API key is not set"):
         await LLMService.query_from_text_async("hello")
 
 
 @pytest.mark.asyncio
 async def test_query_from_text_success(monkeypatch):
-    monkeypatch.setattr(LLMService, "API_KEY", "fake-key")
+    monkeypatch.setenv("LLM_API_KEY", "fake-key")
 
-    request = httpx.Request("POST", LLMService.ENDPOINT)
-
+    request = httpx.Request("POST", ENDPOINT)
     response = httpx.Response(
         200,
         request=request,
@@ -35,9 +38,9 @@ async def test_query_from_text_success(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_query_from_text_http_error(monkeypatch):
-    monkeypatch.setattr(LLMService, "API_KEY", "fake-key")
+    monkeypatch.setenv("LLM_API_KEY", "fake-key")
 
-    request = httpx.Request("POST", LLMService.ENDPOINT)
+    request = httpx.Request("POST", ENDPOINT)
     response = httpx.Response(500, request=request)
 
     with patch("httpx.AsyncClient") as mock_client:
@@ -51,23 +54,24 @@ async def test_query_from_text_http_error(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_query_from_text_request_error(monkeypatch):
-    monkeypatch.setattr(LLMService, "API_KEY", "fake-key")
+    monkeypatch.setenv("LLM_API_KEY", "fake-key")
 
-    mock_post = AsyncMock(side_effect=httpx.RequestError("Connection error"))
-
-    with patch("httpx.AsyncClient.post", mock_post):
+    with patch(
+        "httpx.AsyncClient.post",
+        AsyncMock(side_effect=httpx.RequestError("Connection error")),
+    ):
         result = await LLMService.query_from_text_async("Hello")
 
-    assert result is None
+    assert result == ""
 
 
 @pytest.mark.asyncio
-async def test_query_from_text_unexpected_error(monkeypatch):
-    monkeypatch.setattr(LLMService, "API_KEY", "fake-key")
+async def test_query_from_text_unexpected_error_propagates(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "fake-key")
 
-    mock_post = AsyncMock(side_effect=Exception("Something broke"))
-
-    with patch("httpx.AsyncClient.post", mock_post):
-        result = await LLMService.query_from_text_async("Hello")
-
-    assert result is None
+    with patch(
+        "httpx.AsyncClient.post",
+        AsyncMock(side_effect=Exception("Something broke")),
+    ):
+        with pytest.raises(Exception, match="Something broke"):
+            await LLMService.query_from_text_async("Hello")
