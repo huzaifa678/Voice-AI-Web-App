@@ -16,10 +16,9 @@ python-dotenv>=1.2.2
 requests>=2.34.2
 groq
 psycopg2-binary
-transformers==4.44.2
+transformers==4.46.2
 numpy==1.26.4
 pika
-tiktoken
 soundfile==0.14.0
 django-cors-headers==4.9.0
 uvicorn[standard]==0.52.0
@@ -45,6 +44,7 @@ pytest-asyncio==1.4.0
 flake8==7.3.0
 black==26.5.1
 autoflake==2.3.3
-TTS==0.22.0
+coqui-tts==0.25.3
+piper-tts==1.6.0
 torchcodec
 celery
