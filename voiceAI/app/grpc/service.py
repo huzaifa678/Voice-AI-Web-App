@@ -1,6 +1,5 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-import os
 import grpc
 from app.audio.services import AudioService
 from app.common.rabbit_mq import publish_audio_task
@@ -14,7 +13,6 @@ from app.models import AudioSession
 
 executor = ThreadPoolExecutor(max_workers=8)
 User = get_user_model()
-ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
 logger = get_logger(__name__)
 tracer = tracer(__name__)
