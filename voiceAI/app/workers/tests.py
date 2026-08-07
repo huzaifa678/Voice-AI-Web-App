@@ -109,7 +109,7 @@ async def test_handle_message_exception(mock_get_connection, mock_query_llm):
 
 
 @pytest.mark.asyncio
-@patch("app.workers.task_tts.TTSService.synthesize", new_callable=Mock)
+@patch("app.workers.task_tts.tts_provider.synthesize", new_callable=Mock)
 @patch("app.workers.task_tts.publish_audio_response", new_callable=AsyncMock)
 async def test_handle_tts_message_success(mock_publish, mock_synthesize):
     fake_audio_bytes = b"fake audio data"
@@ -127,7 +127,7 @@ async def test_handle_tts_message_success(mock_publish, mock_synthesize):
 
 
 @pytest.mark.asyncio
-@patch("app.workers.task_tts.TTSService.synthesize", new_callable=Mock)
+@patch("app.workers.task_tts.tts_provider.synthesize", new_callable=Mock)
 @patch("app.workers.task_tts.publish_audio_response", new_callable=AsyncMock)
 async def test_handle_tts_message_synthesize_exception(mock_publish, mock_synthesize):
     mock_synthesize.side_effect = Exception("Synthesis failed")
