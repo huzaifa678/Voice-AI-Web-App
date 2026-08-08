@@ -1,0 +1,18 @@
+voice_ai::node::node_user: ubuntu
+voice_ai::node::manage_docker: true
+voice_ai::node::manage_nvidia: true
+
+voice_ai::node::base_packages:
+  - git
+  - curl
+  - ca-certificates
+  - apt-transport-https
+  - gnupg
+  - ubuntu-drivers-common
+
+# snap name => confinement flag ('classic', or '' for strict confinement)
+voice_ai::node::snaps:
+  microk8s: classic
+  helm: classic
+  kubectl: classic
+  k9s: ''
