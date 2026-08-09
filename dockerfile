@@ -44,11 +44,8 @@ RUN pip install -e ./SimulStreaming
 
 COPY models /app/models
 
-COPY .env.docker /app/.env.docker
-
 RUN mkdir -p /root/.local/share/tts
 
-RUN chmod 600 /app/.env.docker && \
-    chmod +x voiceAI/*.sh
+RUN chmod +x voiceAI/*.sh
 
 EXPOSE 8000

@@ -1,4 +1,5 @@
 .env
+.env.docker
 frontend
 venv
 .vscode
@@ -10,3 +11,4 @@ e2e
 .pytest_cache
 .github
 observability
+puppet
