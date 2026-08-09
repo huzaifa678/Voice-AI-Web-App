@@ -41,7 +41,7 @@ The tooling is layered so each piece owns one concern -> Puppet Bolt owns everyt
 Run from this `puppet/` directory -> Bolt SSHes in and walks the node through the whole bootstrap:
 
 ```bash
-bolt plan run voice_ai::provision --targets gpu groq_api_key="$GROQ_API_KEY"
+bolt plan run voice_ai::provision --targets gpu groq_api_key="$GROQ_API_KEY" google_app_password="$GOOGLE_APP_PASSWORD"
 ```
 
 The plan runs in order:
@@ -58,12 +58,12 @@ The plan runs in order:
 
 6. clones or refreshes the app repo on the node
 
-7. hands off to `voice_ai::deploy` -> creates the `voice-ai-groq` secret then runs `helm dependency build` and `helm upgrade --install`, finally patches the GPU operator for time-slicing and prints the advertised GPU slice count (expect `2`)
+7. hands off to `voice_ai::deploy` -> creates the `voice-ai-groq` and `voice-ai-google` secrets then runs `helm dependency build` and `helm upgrade --install`, finally patches the GPU operator for time-slicing and prints the advertised GPU slice count (expect `2`)
 
 Provision the node only and skip the Helm release with `deploy=false`:
 
 ```bash
-bolt plan run voice_ai::provision --targets gpu groq_api_key="$GROQ_API_KEY" deploy=false
+bolt plan run voice_ai::provision --targets gpu groq_api_key="$GROQ_API_KEY" google_app_password="$GOOGLE_APP_PASSWORD" deploy=false
 ```
 
 ## Deploying a new Release:
@@ -71,10 +71,10 @@ bolt plan run voice_ai::provision --targets gpu groq_api_key="$GROQ_API_KEY" dep
 Once the node is provisioned, ship a new image tag without touching the OS -> this is the Helm only path, no drivers and no reboots:
 
 ```bash
-bolt plan run voice_ai::deploy --targets gpu groq_api_key="$GROQ_API_KEY" image_tag=v1.0.2
+bolt plan run voice_ai::deploy --targets gpu groq_api_key="$GROQ_API_KEY" google_app_password="$GOOGLE_APP_PASSWORD" image_tag=v1.0.2
 ```
 
-`groq_api_key` is a `Sensitive` parameter -> Bolt masks it in the logs and it is delivered straight into the in-cluster `voice-ai-groq` secret, it is never written to git.
+`groq_api_key` and `google_app_password` are `Sensitive` parameters -> Bolt masks them in the logs and delivers them straight into the in-cluster `voice-ai-groq` and `voice-ai-google` secrets, they are never written to git. The Gmail address defaults to `voiceai3004@gmail.com` and is overridden with `google_user_email=...`.
 
 ## Seperation from CI:
 
