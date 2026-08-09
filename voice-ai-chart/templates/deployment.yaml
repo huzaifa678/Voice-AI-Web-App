@@ -31,11 +31,21 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           workingDir: /app/voiceAI
           command: ["sh", "-c", "./k8s-start.sh"]
-          env: 
+          env:
             {{- range $key, $value := .Values.env}}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            - name: {{ .Values.google.userEmailKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "voice-ai.googleSecretName" . }}
+                  key: {{ .Values.google.userEmailKey }}
+            - name: {{ .Values.google.appPasswordKey }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "voice-ai.googleSecretName" . }}
+                  key: {{ .Values.google.appPasswordKey }}
           ports:
             - containerPort: 8000
           readinessProbe:

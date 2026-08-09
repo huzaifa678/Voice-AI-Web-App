@@ -37,3 +37,11 @@ voice-ai-tts-worker
 {{- printf "%s-groq" (include "voice-ai.fullname" .) -}}
 {{- end -}}
 {{- end }}
+
+{{- define "voice-ai.googleSecretName" -}}
+{{- if .Values.google.existingSecret -}}
+{{- .Values.google.existingSecret -}}
+{{- else -}}
+{{- printf "%s-google" (include "voice-ai.fullname" .) -}}
+{{- end -}}
+{{- end }}

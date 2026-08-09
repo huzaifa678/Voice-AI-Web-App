@@ -1,13 +1,16 @@
 plan voice_ai::provision (
-  TargetSpec        $targets     = 'gpu',
+  TargetSpec        $targets             = 'gpu',
   Sensitive[String] $groq_api_key,
-  String            $node_user   = 'ubuntu',
-  String            $repo_url    = 'https://github.com/huzaifa678/Voice-AI-Web-App.git',
-  String            $repo_dir    = '/home/ubuntu/Voice-AI-Web-App',
-  String            $namespace   = 'voice-ai',
-  String            $release     = 'voice-ai',
-  String            $secret_name = 'voice-ai-groq',
-  Boolean           $deploy      = true,
+  Sensitive[String] $google_app_password,
+  String            $google_user_email   = 'voiceai3004@gmail.com',
+  String            $node_user           = 'ubuntu',
+  String            $repo_url            = 'https://github.com/huzaifa678/Voice-AI-Web-App.git',
+  String            $repo_dir            = '/home/ubuntu/Voice-AI-Web-App',
+  String            $namespace           = 'voice-ai',
+  String            $release             = 'voice-ai',
+  String            $secret_name         = 'voice-ai-groq',
+  String            $google_secret_name  = 'voice-ai-google',
+  Boolean           $deploy              = true,
 ) {
   $mk = '/snap/bin/microk8s'
 
@@ -38,14 +41,17 @@ plan voice_ai::provision (
 
   if $deploy {
     return run_plan('voice_ai::deploy', {
-      'targets'      => $targets,
-      'groq_api_key' => $groq_api_key,
-      'node_user'    => $node_user,
-      'repo_dir'     => $repo_dir,
-      'namespace'    => $namespace,
-      'release'      => $release,
-      'secret_name'  => $secret_name,
-      'refresh_repo' => false,
+      'targets'             => $targets,
+      'groq_api_key'        => $groq_api_key,
+      'google_app_password' => $google_app_password,
+      'google_user_email'   => $google_user_email,
+      'node_user'           => $node_user,
+      'repo_dir'            => $repo_dir,
+      'namespace'           => $namespace,
+      'release'             => $release,
+      'secret_name'         => $secret_name,
+      'google_secret_name'  => $google_secret_name,
+      'refresh_repo'        => false,
     })
   }
 

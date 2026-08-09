@@ -44,6 +44,13 @@ groq:
   apiKey: ""
   imagePullPolicy: Always
 
+google:
+  existingSecret: ""
+  userEmailKey: GOOGLE_USER_EMAIL
+  appPasswordKey: GOOGLE_APP_PASSWORD
+  userEmail: ""
+  appPassword: ""
+
 e2e:
   image:
     repository: huzaifagill234/e2e-runner
@@ -90,7 +97,6 @@ env:
   RABBITMQ_USER: guest
   RABBITMQ_PASSWORD: guest
   RABBITMQ_URL: amqp://guest:guest@voice-ai-rabbitmq:5672//
-  GOOGLE_USER_EMAIL: voiceai3004@gmail.com
   ALLOWED_HOSTS: "voice-ai,voice-ai.default.svc.cluster.local,localhost,127.0.0.1"
   GRPC_DEPLOYMENT_TYPE: remote
   ENVIRONMENT: infra-test
