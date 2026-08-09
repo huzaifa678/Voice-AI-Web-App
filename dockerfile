@@ -42,8 +42,6 @@ COPY . .
 
 RUN pip install -e ./SimulStreaming
 
-COPY models /app/models
-
 RUN mkdir -p /root/.local/share/tts
 
 RUN chmod +x voiceAI/*.sh
