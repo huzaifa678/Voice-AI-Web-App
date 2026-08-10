@@ -86,6 +86,58 @@ Provisioning and deploy live here and are run by you, GitHub Actions only builds
 
 So a release is -> tag `v*` -> CI builds and pushes the image -> you run `voice_ai::deploy image_tag=v1.0.2` when you want it live, the deploy is always deliberate and human triggered.
 
+## Traditional Agent / Master Setup:
+
+Everything above uses Bolt -> agentless, push based, no Puppet Server and no long running daemon, you drive it from your machine over SSH. The classic Puppet architecture is the opposite -> a central Puppet Server (the master) compiles catalogs and a `puppet-agent` daemon on every node pulls and applies its catalog on a schedule (default every 30 minutes). This section documents that model for the same node.
+
+### How it works:
+
+* **Pull not push:** the `puppet-agent` on the g4dn node wakes up every ~30 min, sends its facts to the master, gets back a compiled catalog and enforces it -> continuous drift correction, anything that changes on the box is put back on the next run
+
+* **Certificate auth:** the master runs a CA -> the agent's first run submits a CSR which you sign once on the master, every run after that is mutually TLS authenticated
+
+* **Central reporting:** every run reports back to the master / PuppetDB -> one place to see node state, failures and compliance across the whole fleet
+
+### Reusing the existing code:
+
+The OS layer you already have ports over unchanged -> the master serves the same `voice_ai::node` class and `data/common.yaml`, only the entry point differs:
+
+* **On the master:** drop this project in as the `voice_ai` module under `/etc/puppetlabs/code/environments/production/modules/voice_ai` and classify the node in `site.pp`:
+
+  ```puppet
+  node 'voice-ai-gpu' {
+    include voice_ai::node
+  }
+  ```
+
+* **What does not port:** the `provision.pp` / `deploy.pp` plans -> `apply_prep`, `microk8s enable`, the Helm commands, the reboot and the GPU time-slicing patch are imperative orchestration, and the agent/master model only converges declarative resources. Keep those as Bolt plans -> master/agent owns `node.pp`, Bolt still owns the orchestration and the Helm deploy
+
+### Setup outline:
+
+1. **Control node (master):** install the Puppet Server and start it
+
+   ```bash
+   sudo apt install -y puppetserver
+   sudo systemctl enable --now puppetserver
+   ```
+
+2. **g4dn node (agent):** install `puppet-agent` and point it at the master
+
+   ```bash
+   sudo apt install -y puppet-agent
+   printf '[main]\nserver = puppet.example.com\n' | sudo tee /etc/puppetlabs/puppet/puppet.conf
+   sudo /opt/puppetlabs/bin/puppet agent -t
+   ```
+
+3. **Master:** sign the agent's certificate once
+
+   ```bash
+   sudo puppetserver ca sign --certname voice-ai-gpu
+   ```
+
+4. **Converge:** the agent now applies `voice_ai::node` every 30 min, or on demand with `sudo puppet agent -t` -> the OS layer stays enforced continuously
+
+
 ## Notes:
 
 * **Root escalation:** the node is escalated to `root` via passwordless sudo (`run-as: root`), a dedicated non-root deploy user is a reasonable next hardening step
