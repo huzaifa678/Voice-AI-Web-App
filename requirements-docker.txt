@@ -1,5 +1,5 @@
 Django>=5.2,<5.3
-djangorestframework>=3.17.1
+djangorestframework>=3.17.2
 djangorestframework-simplejwt
 rest_framework_simplejwt
 channels>=4.3.2
