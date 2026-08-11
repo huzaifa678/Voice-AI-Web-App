@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import time
 import json
 import grpc
@@ -74,7 +75,11 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
             await self.close(code=4401)
             return
 
-        rate_limit(key=f"ws:{ip}", limit=30, window_seconds=60)
+        # rate_limit hits Redis with a blocking client; keep it off the loop.
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None, functools.partial(rate_limit, key=f"ws:{ip}", limit=30, window_seconds=60)
+        )
 
         self.session = VoiceSession(
             user_id=str(self.user_id)
@@ -143,6 +148,8 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
         audio = np.frombuffer(bytes_data, dtype=np.int16).astype(np.float32)
         audio /= INT16_MAX
 
+        loop = asyncio.get_running_loop()
+
         # O(1) append to deque instead of np.concatenate
         self.vad_frame_buffer.extend(audio.tolist())
 
@@ -168,7 +175,13 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
             if rms < RMS_GATE:
                 prob = 0.0
             else:
-                prob = float(VADService.speech_prob(frame_float, sample_rate=TARGET_SR))
+                # running torch forward pass off the event loop 
+                # avoiding stalling the websocket consumer for long periods of time
+                prob = float(
+                    await loop.run_in_executor(
+                        None, VADService.speech_prob, frame_float, TARGET_SR
+                    )
+                )
 
             self.session.prob_history.append(prob)
             if len(self.session.prob_history) > smooth_frame_count:

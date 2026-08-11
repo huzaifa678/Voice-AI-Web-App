@@ -7,10 +7,14 @@ For more information on this file, see
 https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
 """
 
+import asyncio
 import os
 import django
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "voiceAI.settings")
+
+# Shutdown grace period set for the gRPC server
+GRPC_SHUTDOWN_GRACE = 10.0
 
 from app.common.telemetry import setup_telemetry
 
@@ -45,7 +49,14 @@ class LifespanApp:
                 if message["type"] == "lifespan.startup":
                     logger.info("ASGI startup")
 
-                    await self.start_grpc_server()
+                    try:
+                        await self.start_grpc_server()
+                    except Exception as exc:
+                        logger.exception("ASGI startup failed")
+                        await send(
+                            {"type": "lifespan.startup.failed", "message": str(exc)}
+                        )
+                        return
 
                     await send({"type": "lifespan.startup.complete"})
 
@@ -73,10 +84,13 @@ class LifespanApp:
         from app.common.rabbit_mq import close_connection
 
         if self.grpc_server:
-            logger.info("Stopping gRPC server...")
-            await self.grpc_server.stop(grace=None)
+            logger.info(
+                "Stopping gRPC server (grace=%.0fs)...", GRPC_SHUTDOWN_GRACE
+            )
+            await self.grpc_server.stop(grace=GRPC_SHUTDOWN_GRACE)
 
-        close_connection()
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, close_connection)
 
 
 application = LifespanApp(
