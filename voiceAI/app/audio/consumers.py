@@ -175,7 +175,7 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
             if rms < RMS_GATE:
                 prob = 0.0
             else:
-                # running torch forward pass off the event loop 
+                # running torch forward pass off the event loop
                 # avoiding stalling the websocket consumer for long periods of time
                 prob = float(
                     await loop.run_in_executor(
