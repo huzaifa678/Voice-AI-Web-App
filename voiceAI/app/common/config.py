@@ -87,6 +87,14 @@ class Config:
         return os.getenv("LLM_API_KEY") or self.GROQ_API_KEY
 
     @property
+    def LLM_CB_FAIL_MAX(self):
+        return int(os.getenv("LLM_CB_FAIL_MAX", "5"))
+
+    @property
+    def LLM_CB_RESET_TIMEOUT(self):
+        return float(os.getenv("LLM_CB_RESET_TIMEOUT", "30"))
+
+    @property
     def OTEL_SDK_DISABLED(self):
         return _bool("OTEL_SDK_DISABLED")
 
