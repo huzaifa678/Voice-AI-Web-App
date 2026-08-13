@@ -66,7 +66,7 @@ metadata:
   labels:
     app: {{ include "voice-ai-grpc.name" . }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.grpc.replicaCount }}
   selector:
     matchLabels:
       app: {{ include "voice-ai-grpc.name" . }}
@@ -117,7 +117,7 @@ metadata:
   labels:
     app: {{ include "voice-ai-audio-worker.name" . }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.audioWorker.replicaCount }}
   selector:
     matchLabels:
       app: {{ include "voice-ai-audio-worker.name" . }}
@@ -158,7 +158,7 @@ metadata:
   labels:
     app: {{ include "voice-ai-tts-worker.name" . }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.ttsWorker.replicaCount }}
   selector:
     matchLabels:
       app: {{ include "voice-ai-tts-worker.name" . }}

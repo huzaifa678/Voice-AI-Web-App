@@ -19,10 +19,10 @@ metadata:
   labels:
     app: {{ include "voice-ai-grpc.name" . }}
 spec:
+  clusterIP: None
   selector:
     app: {{ include "voice-ai-grpc.name" . }}
   ports:
     - protocol: TCP
       port: 50051
       targetPort: 50051
-  type: ClusterIP
