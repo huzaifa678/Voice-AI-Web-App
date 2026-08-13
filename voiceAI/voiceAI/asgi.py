@@ -21,6 +21,7 @@ from app.common.telemetry import setup_telemetry
 setup_telemetry("voice-ai-web")
 django.setup()
 
+from app.common.config import config
 from app.common.logger import get_logger
 logger = get_logger(__name__)
 
@@ -50,7 +51,14 @@ class LifespanApp:
                     logger.info("ASGI startup")
 
                     try:
-                        await self.start_grpc_server()
+                        if config.GRPC_DEPLOYMENT_TYPE == "local":
+                            await self.start_grpc_server()
+                        else:
+                            logger.info(
+                                "GRPC_DEPLOYMENT_TYPE=%s; deferring STT to the external "
+                                "gRPC service, not embedding one in the web runtime",
+                                config.GRPC_DEPLOYMENT_TYPE,
+                            )
                     except Exception as exc:
                         logger.exception("ASGI startup failed")
                         await send(
