@@ -114,11 +114,18 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
         # TCP + HTTP/2 handshake overhead.
         self._grpc_target = config.GRPC_DEPLOYMENT_TYPE
         if self._grpc_target == "remote":
-            self._grpc_host = "voice-ai-grpc:50051"
+            # Headless Service resolves to every STT pod IP; the dns:/// resolver
+            # plus round_robin spreads calls across them. A plain ClusterIP would
+            # pin every call to a single pod over this one HTTP/2 connection.
+            self._grpc_host = "dns:///voice-ai-grpc:50051"
+            channel_options = [("grpc.lb_policy_name", "round_robin")]
         else:
             self._grpc_host = "localhost:50051"
+            channel_options = []
 
-        self.grpc_channel = grpc.aio.insecure_channel(self._grpc_host)
+        self.grpc_channel = grpc.aio.insecure_channel(
+            self._grpc_host, options=channel_options
+        )
         self.grpc_stub = service_pb2_grpc.AudioServiceStub(self.grpc_channel)
 
         # Use deque for O(1) append/pop instead of repeated np.concatenate
