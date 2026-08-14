@@ -1,5 +1,6 @@
 ARG PLATFORM=linux/amd64
-FROM --platform=$PLATFORM python:3.11-slim AS builder
+# pinning to bookworn so the torch codec can load FFmpeg < 7
+FROM --platform=$PLATFORM python:3.11-slim-bookworm AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -20,7 +21,7 @@ RUN pip install --upgrade pip setuptools wheel && \
     --extra-index-url https://download.pytorch.org/whl/cpu \
     -r requirements-docker.txt -w /wheels
 
-FROM --platform=$PLATFORM python:3.11-slim
+FROM --platform=$PLATFORM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
