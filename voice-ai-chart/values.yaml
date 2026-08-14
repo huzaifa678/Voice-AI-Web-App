@@ -305,7 +305,7 @@ thanos:
     replicaCount: 1
     dnsDiscovery:
       enabled: true
-      sidecarsService: voice-ai-kube-prometheus-stack-thanos-discovery
+      sidecarsService: voice-ai-kube-prometheus-s-thanos-discovery
       sidecarsNamespace: voice-ai
     resources:
       requests:
