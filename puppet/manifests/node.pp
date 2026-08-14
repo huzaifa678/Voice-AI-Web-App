@@ -55,7 +55,12 @@ class voice_ai::node (
     exec { 'nvidia-driver':
       command => 'ubuntu-drivers install --gpgpu',
       path    => ['/usr/bin', '/bin', '/usr/sbin', '/sbin'],
-      unless  => 'nvidia-smi',
+      # Guard on the file the driver installs, not a command guard: `creates` is
+      # a pure File.exist? check inside Puppet, so it never spawns a guard
+      # process -> it sidesteps the empty "Could not evaluate" that exec command
+      # guards hit with this jammy-built agent on a newer Ubuntu. Idempotent:
+      # once the driver is in, /usr/bin/nvidia-smi exists and this is a no-op.
+      creates => '/usr/bin/nvidia-smi',
       timeout => 1800,
       require => Package['ubuntu-drivers-common'],
     }
