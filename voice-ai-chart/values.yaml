@@ -149,6 +149,11 @@ kube-prometheus-stack:
         memory: 128Mi
       limits:
         memory: 256Mi
+    # served under /grafana via ingress, so Grafana must expect the subpath
+    grafana.ini:
+      server:
+        root_url: "%(protocol)s://%(domain)s/grafana"
+        serve_from_sub_path: true
     ingress:
       enabled: true
       ingressClassName: nginx
@@ -319,8 +324,10 @@ ingress-nginx:
   enabled: true
 
   controller:
+    hostPort:
+      enabled: true
     service:
-      type: LoadBalancer
+      type: ClusterIP
 
 whisper:
   enableInitContainer: true
