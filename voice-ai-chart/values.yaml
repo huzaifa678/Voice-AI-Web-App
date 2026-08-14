@@ -176,6 +176,13 @@ kube-prometheus-stack:
       pathType: Prefix
 
   prometheus:
+    # Headless gRPC service the Thanos sidecar is exposed through. Disabled by
+    # default in the chart, so Thanos Query's SRV lookup of
+    # kube prometheus-stack-thanos-discovery.voice-ai.svc.cluster.local fails
+    # and Query can't reach the live sidecar. Enabling it creates that service.
+    thanosService:
+      enabled: true
+
     ingress:
       enabled: true
       ingressClassName: nginx
@@ -372,26 +379,6 @@ opentelemetry-collector:
           http:
             endpoint: 0.0.0.0:4318
 
-      filelog:
-        include:
-          - /var/log/app/*.log
-        start_at: beginning
-
-        operators:
-          - type: regex_parser
-            regex: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| (?P<level>\w+) \| (?P<logger>[^|]+) \| (?P<message>.*)$'
-
-            timestamp:
-              parse_from: attributes.time
-              layout: "%Y-%m-%d %H:%M:%S"
-
-            severity:
-              parse_from: attributes.level
-
-          - type: move
-            from: attributes.message
-            to: body
-
     processors:
       memory_limiter:
         check_interval: 1s
@@ -450,7 +437,6 @@ opentelemetry-collector:
         logs:
           receivers:
             - otlp
-            - filelog
           processors:
             - memory_limiter
             - batch
