@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import json
+import logging
 import os
 from urllib.parse import quote
 import numpy as np
@@ -8,9 +9,13 @@ import pytest
 import httpx
 from websockets.asyncio.client import connect
 import soundfile as sf
-from app.common.logger import get_logger
 
-logger = get_logger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 TARGET_SR = 16000
 INT16_MAX = 32767
