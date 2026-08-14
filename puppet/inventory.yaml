@@ -1,12 +1,12 @@
 groups:
   - name: gpu
     targets:
-      - uri: REPLACE_WITH_EC2_PUBLIC_DNS_OR_IP
+      - uri: 3.236.112.14
         name: voice-ai-gpu
     config:
       transport: ssh
       ssh:
         user: ubuntu
-        private-key: ~/.ssh/voice-ai.pem
+        private-key: ~/Downloads/voice-ai-key.pem
         host-key-check: false
         run-as: root

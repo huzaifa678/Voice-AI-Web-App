@@ -26,12 +26,14 @@ The tooling is layered so each piece owns one concern -> Puppet Bolt owns everyt
 
 * **`plans/deploy.pp`:** the `voice_ai::deploy` plan -> the Helm only release that never touches the OS, the drivers or reboots the node
 
+* **`plans/cluster.pp`:** the `voice_ai::cluster` plan -> the post-OS half of `provision.pp` (reboot-if-needed, MicroK8s addons, kubeconfig, repo, Helm) for when the agent/master already owns the OS layer, so Bolt skips the `voice_ai::node` apply
+
 ## Pre-requisites:
 
 * **Install Bolt on your machine:**
 
   ```bash
-  brew install puppet-bolt
+  brew install --cask puppetlabs/puppet/puppet-bolt
   ```
 
 * **Edit the inventory:** set the instance public DNS/IP and the `.pem` key path inside `inventory.yaml` -> the node is reached as the `ubuntu` user and escalated to `root` via passwordless sudo (`run-as: root`)
@@ -110,7 +112,7 @@ The OS layer you already have ports over unchanged -> the master serves the same
   }
   ```
 
-* **What does not port:** the `provision.pp` / `deploy.pp` plans -> `apply_prep`, `microk8s enable`, the Helm commands, the reboot and the GPU time-slicing patch are imperative orchestration, and the agent/master model only converges declarative resources. Keep those as Bolt plans -> master/agent owns `node.pp`, Bolt still owns the orchestration and the Helm deploy
+* **What does not port:** the `provision.pp` / `deploy.pp` plans -> `apply_prep`, `microk8s enable`, the Helm commands, the reboot and the GPU time-slicing patch are imperative orchestration, and the agent/master model only converges declarative resources. Keep those as Bolt plans -> master/agent owns `node.pp`, Bolt still owns the orchestration and the Helm deploy. The `voice_ai::cluster` plan is the ready-made entry point for this split -> it is `provision.pp` with the `voice_ai::node` apply removed, so the agent handles the OS and Bolt picks up from the addons onward
 
 ### Setup outline:
 
@@ -136,6 +138,12 @@ The OS layer you already have ports over unchanged -> the master serves the same
    ```
 
 4. **Converge:** the agent now applies `voice_ai::node` every 30 min, or on demand with `sudo puppet agent -t` -> the OS layer stays enforced continuously
+
+5. **Cluster + app:** the agent stops at the OS layer, so bring up MicroK8s and the Helm release from your machine with the plan that skips the `voice_ai::node` apply -> reboots the node once if the NVIDIA driver is not live yet (the agent installs it but never reboots), then enables the addons, writes the kubeconfig, clones the repo and hands off to `voice_ai::deploy`:
+
+   ```bash
+   bolt plan run voice_ai::cluster --targets gpu groq_api_key="$GROQ_API_KEY" google_app_password="$GOOGLE_APP_PASSWORD"
+   ```
 
 
 ## Notes:
