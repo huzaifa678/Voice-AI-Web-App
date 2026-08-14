@@ -1,5 +1,5 @@
 ARG PLATFORM=linux/amd64
-# pinning to bookworn so the torch codec can load FFmpeg < 7
+# bookworm ships FFmpeg 5, which is inside torchcodec 0.10's supported range (4-9)
 FROM --platform=$PLATFORM python:3.11-slim-bookworm AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -16,9 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements-docker.txt .
 
+# Install the default CUDA PyTorch build from PyPI. The CUDA runtime libs ride
+# along as nvidia-* wheel deps, so grpc/tts pods can use the GPU; the NVIDIA
+# device plugin provides the driver.
 RUN pip install --upgrade pip setuptools wheel && \
     pip wheel --no-cache-dir \
-    --extra-index-url https://download.pytorch.org/whl/cpu \
     -r requirements-docker.txt -w /wheels
 
 FROM --platform=$PLATFORM python:3.11-slim-bookworm

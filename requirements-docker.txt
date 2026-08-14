@@ -4,9 +4,9 @@ djangorestframework-simplejwt
 rest_framework_simplejwt
 channels>=4.3.2
 channels-redis>=4.3.0
-torch==2.10.0+cpu
+torch==2.10.0
 torchvision==0.25.0
-torchaudio==2.10.0+cpu
+torchaudio==2.10.0
 torchcodec==0.10.0
 faster-whisper>=1.2.1
 silero-vad

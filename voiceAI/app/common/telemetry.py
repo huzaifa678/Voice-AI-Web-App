@@ -3,6 +3,8 @@ from typing import Iterable
 
 from app.common.config import config
 from opentelemetry import propagate, trace
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.celery import CeleryInstrumentor
 from opentelemetry.instrumentation.django import DjangoInstrumentor
@@ -12,6 +14,8 @@ from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.resources import DEPLOYMENT_ENVIRONMENT, SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
@@ -60,6 +64,19 @@ def setup_telemetry(service_name: str | None = None) -> None:
 
     if config.OTEL_CONSOLE_EXPORTER:
         provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+
+    # Exporting stdlib logs over OTLP to the collector -> Loki. Without this the app
+    # only emits traces; the collector's logs pipeline receives nothing and Loki
+    # stays empty. LoggingInstrumentor below only injects trace/span ids, it does
+    # not export logs on its own.
+    logger_provider = LoggerProvider(resource=resource)
+    set_logger_provider(logger_provider)
+    logger_provider.add_log_record_processor(
+        BatchLogRecordProcessor(OTLPLogExporter(endpoint=endpoint, insecure=True))
+    )
+    logging.getLogger().addHandler(
+        LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
+    )
 
     DjangoInstrumentor().instrument()
     GrpcAioInstrumentorClient().instrument()
