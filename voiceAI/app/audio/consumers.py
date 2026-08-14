@@ -365,7 +365,7 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
                 return {"transcript": transcript}
 
         try:
-            return await asyncio.wait_for(consume_stream(), timeout=30.0)
+            return await asyncio.wait_for(consume_stream(), timeout=90.0)
 
         except asyncio.CancelledError:
             await self.log("[gRPC] Call cancelled due to disconnect")
@@ -424,7 +424,7 @@ class AudioStreamConsumer(AsyncWebsocketConsumer):
                 return {"transcript": transcript}
 
         try:
-            return await asyncio.wait_for(consume_stream(), timeout=30.0)
+            return await asyncio.wait_for(consume_stream(), timeout=90.0)
 
         except asyncio.CancelledError:
             await self.log("[gRPC] Call cancelled due to disconnect")
