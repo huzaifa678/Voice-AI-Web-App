@@ -149,6 +149,21 @@ kube-prometheus-stack:
         memory: 128Mi
       limits:
         memory: 256Mi
+    # configuring grafana to explicitly use the Loki and Tempo datasources, so the app can query them via the Grafana API
+    additionalDataSources:
+      - name: Tempo
+        type: tempo
+        uid: tempo
+        access: proxy
+        url: http://voice-ai-tempo:3200
+        jsonData:
+          tracesToLogsV2:
+            datasourceUid: loki
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://voice-ai-loki:3100
     # served under /grafana via ingress, so Grafana must expect the subpath
     grafana.ini:
       server:
