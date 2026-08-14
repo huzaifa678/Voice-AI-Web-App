@@ -36,7 +36,7 @@ volumeClaim:
 
 image:
   repository: huzaifagill234/voice-ai-web
-  tag: ci-v1.2.0
+  tag: sha-fcd176f
 
 groq:
   existingSecret: ""
