@@ -8,9 +8,16 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag suffix, e.g. v1.2.1 -> ci-v1.2.1. Blank = short SHA only."
+        required: false
+        default: ""
 
 jobs:
   test:
+    # manual dispatch is for building the image on its own, so skip tests then
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     services:
