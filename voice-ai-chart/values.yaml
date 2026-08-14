@@ -137,8 +137,18 @@ service:
 kube-prometheus-stack:
   enabled: true
 
+  # no alerting wired up, and it saves ~1 pod of memory on a single node
+  alertmanager:
+    enabled: false
+
   grafana:
     enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
     ingress:
       enabled: true
       ingressClassName: nginx
@@ -151,34 +161,159 @@ kube-prometheus-stack:
       ingressClassName: nginx
       paths:
         - /prometheus
+    prometheusSpec:
+      # short local retention; Thanos takes over long-term storage to S3
+      retention: 24h
+      resources:
+        requests:
+          cpu: 200m
+          memory: 768Mi
+        limits:
+          memory: 2Gi
+
+      externalLabels:
+        cluster: voice-ai
+
+      thanos:
+        objectStorageConfig:
+          existingSecret:
+            name: thanos-objstore
+            key: objstore.yml
 
 loki:
   enabled: true
+  deploymentMode: SingleBinary
 
-  storage:
-    bucketNames:
-      chunks: voice-ai-loki
-      ruler: voice-ai-loki
-      admin: voice-ai-loki
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    schemaConfig:
+      configs:
+        - from: "2024-04-01"
+          store: tsdb
+          object_store: s3
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+    storage:
+      type: s3
+      bucketNames:
+        chunks: voice-ai-loki
+        ruler: voice-ai-loki
+        admin: voice-ai-loki
+      s3:
+        region: us-east-1
+    limits_config:
+      retention_period: 168h
+      allow_structured_metadata: true
+
+  singleBinary:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+
+  # single node: no scalable components, memcached caches, gateway, canary,
+  # test, or the bundled minio
+  read:
+    replicas: 0
+  write:
+    replicas: 0
+  backend:
+    replicas: 0
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
+  lokiCanary:
+    enabled: false
+  test:
+    enabled: false
+  gateway:
+    enabled: false
+  minio:
+    enabled: false
 
 tempo:
   enabled: true
 
-  storage:
-    trace:
-      backend: s3
-      s3:
-        bucket: voice-ai-tempo
-        region: us-east-1
+  tempo:
+    storage:
+      trace:
+        backend: s3
+        s3:
+          bucket: voice-ai-tempo
+          endpoint: s3.us-east-1.amazonaws.com
+          region: us-east-1
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+
+  persistence:
+    enabled: false
 
 thanos:
   enabled: true
 
-  objstoreConfig: |
-    type: S3
-    config:
-      bucket: voice-ai-thanos
-      region: us-east-1
+  image:
+    repository: bitnamilegacy/thanos
+
+  existingObjstoreSecret: thanos-objstore
+
+  query:
+    enabled: true
+    replicaCount: 1
+    dnsDiscovery:
+      enabled: true
+      sidecarsService: voice-ai-kube-prometheus-stack-thanos-discovery
+      sidecarsNamespace: voice-ai
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+  storegateway:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+
+  compactor:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+  # not needed for a single-Prometheus setup
+  queryFrontend:
+    enabled: false
+  receive:
+    enabled: false
+  ruler:
+    enabled: false
+  bucketweb:
+    enabled: false
 
 ingress-nginx:
   enabled: true
@@ -192,6 +327,10 @@ whisper:
 
 opentelemetry-collector:
   enabled: true
+
+  # the app exports to http://opentelemetry-collector:4317, so pin the service
+  # name to match (otherwise it would be voice-ai-opentelemetry-collector)
+  fullnameOverride: opentelemetry-collector
 
   mode: deployment
 
