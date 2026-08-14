@@ -55,7 +55,7 @@ e2e:
   image:
     repository: huzaifagill234/e2e-runner
     tag: ci
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   env:
     HTTP_BASE: "http://voice-ai:8000/api"
     HTTP_BASE_HEALTH: "http://voice-ai:8000"
