@@ -79,11 +79,11 @@ class TTSService(BaseTTSService):
                 model.get_conditioning_latents(SPEAKER_WAV)
             )
 
-        if DEVICE == "cuda":
-            model = model.half()
-            TTSService._gpt_cond_latent = TTSService._gpt_cond_latent.half()
-            TTSService._speaker_embedding = TTSService._speaker_embedding.half()
-
+        # XTTS does not have a reliable full-model fp16 path. Some parts of the
+        # STFT/mel pipeline and the GPT/HiFiGAN stack still require fp32, so calling
+        # model.half() causes inference() to fail with "expected scalar type Float but
+        # found Half" on every chunk therefore removeing the fp16 conversion and
+        # keeping the model in fp32 on the GPU for stable inference.
         model.eval()
 
     @staticmethod
